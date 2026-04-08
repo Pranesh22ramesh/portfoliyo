@@ -25,10 +25,10 @@ const socials = [
   },
 ];
 
-// EmailJS config - replace with your real credentials from https://www.emailjs.com/
-const EMAILJS_SERVICE_ID = 'service_portfolio';
-const EMAILJS_TEMPLATE_ID = 'template_contact';
-const EMAILJS_PUBLIC_KEY = 'YOUR_PUBLIC_KEY';
+// EmailJS config - using environment variables for security
+const EMAILJS_SERVICE_ID = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID || 'service_portfolio';
+const EMAILJS_TEMPLATE_ID = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID || 'template_contact';
+const EMAILJS_PUBLIC_KEY = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY || 'YOUR_PUBLIC_KEY';
 
 export default function Contact() {
   const [isFormOpen, setIsFormOpen] = useState(false);
