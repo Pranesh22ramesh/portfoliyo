@@ -179,10 +179,10 @@ export default function Hero() {
 
           {/* ── Clip-path Text Reveal: Name ─── */}
           <h2 className="text-4xl md:text-5xl lg:text-7xl font-display font-medium text-foreground tracking-tight overflow-hidden py-2">
-            <TextReveal text="Pranesh" delayStart={0.5} />
+            <TextReveal text="PRANESH" delayStart={0.5} />
             {' '}
             <span className="gradient-text font-bold italic">
-              <TextReveal text="Ramesh" delayStart={1.2} />
+              <TextReveal text="RAMESH" delayStart={1.2} />
             </span>
           </h2>
         </motion.div>
