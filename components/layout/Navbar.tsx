@@ -4,23 +4,36 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
 import Link from 'next/link';
 
-import { Menu, X, Sun, Moon, ArrowRight } from 'lucide-react';
+import {
+  Menu,
+  X,
+  Sun,
+  Moon,
+  ArrowRight,
+  Home,
+  User,
+  Cpu,
+  Briefcase,
+  Award,
+  Mail
+} from 'lucide-react';
 import { useTheme } from '@/components/providers/ThemeProvider';
 
 const navLinks = [
-  { name: 'Home', href: '/', id: 'home' },
-  { name: 'About', href: '/#about', id: 'about' },
-  { name: 'Skills', href: '/#skills', id: 'skills' },
-  { name: 'Projects', href: '/#projects', id: 'projects' },
-  { name: 'Highlights', href: '/#achievements', id: 'achievements' },
-  { name: 'Contact', href: '/#contact', id: 'contact' },
+  { name: 'Home', href: '/', id: 'home', icon: Home, desc: 'Intro & Resume' },
+  { name: 'About', href: '/#about', id: 'about', icon: User, desc: 'Background & Bio' },
+  { name: 'Skills', href: '/#skills', id: 'skills', icon: Cpu, desc: 'Tech Stack & Tools' },
+  { name: 'Projects', href: '/#projects', id: 'projects', icon: Briefcase, desc: 'Shipped Products' },
+  { name: 'Highlights', href: '/#achievements', id: 'achievements', icon: Award, desc: 'Honors & Trophies' },
+  { name: 'Contact', href: '/#contact', id: 'contact', icon: Mail, desc: 'Get in Touch' },
 ];
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
-  const { scrollY } = useScroll();
+  const { scrollY, scrollYProgress } = useScroll();
   const [scrolled, setScrolled] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [activeSection, setActiveSection] = useState('home');
   const { theme, toggleTheme } = useTheme();
   const lastScrollY = useRef(0);
@@ -53,6 +66,10 @@ export default function Navbar() {
     }
     setScrolled(latest > 20);
     lastScrollY.current = latest;
+  });
+
+  useMotionValueEvent(scrollYProgress, 'change', (latest) => {
+    setProgress(latest);
   });
 
   const handleLinkClick = (href: string) => {
@@ -89,7 +106,6 @@ export default function Navbar() {
             Pranesh.
           </Link>
 
-          {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-6 lg:gap-8">
             {navLinks.map((link, i) => (
               <motion.div
@@ -97,6 +113,7 @@ export default function Navbar() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 + i * 0.05 }}
+                className="relative"
               >
                 <Link
                   href={link.href}
@@ -108,15 +125,20 @@ export default function Navbar() {
                   <motion.span
                     whileHover={{ letterSpacing: '0.05em' }}
                     transition={{ duration: 0.3 }}
-                    className="inline-block"
+                    className="inline-block will-change-transform"
                   >
                     {link.name}
                   </motion.span>
-                  <span
-                    className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-primary to-blue-500 transition-all duration-300 ${
-                      activeSection === link.id ? 'w-full' : 'w-0 group-hover:w-full'
-                    }`}
-                  />
+                  {/* Shared layoutId underline — slides between active links */}
+                  {activeSection === link.id ? (
+                    <motion.span
+                      layoutId="nav-active-underline"
+                      className="absolute bottom-0 left-0 h-0.5 w-full bg-gradient-to-r from-primary to-blue-500 rounded-full will-change-transform"
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                    />
+                  ) : (
+                    <span className="absolute bottom-0 left-0 h-0.5 w-0 group-hover:w-full bg-gradient-to-r from-primary/50 to-blue-500/50 rounded-full transition-all duration-300" />
+                  )}
                 </Link>
               </motion.div>
             ))}
@@ -124,6 +146,20 @@ export default function Navbar() {
 
           {/* Actions */}
           <div className="flex items-center gap-2 sm:gap-4">
+            <AnimatePresence>
+              {progress > 0.1 && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8, x: 20 }}
+                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.8, x: 20 }}
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-[10px] font-semibold text-primary uppercase tracking-wider"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                  ~{Math.max(1, Math.ceil(3 * (1 - progress)))} min read
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <motion.button
               whileHover={{ scale: 1.15 }}
               whileTap={{ scale: 0.9 }}
@@ -185,26 +221,41 @@ export default function Navbar() {
             exit={{ opacity: 0, height: 0 }}
             className="absolute top-[80px] left-0 w-full px-4 sm:px-6 md:hidden overflow-hidden"
           >
-            <div className="glass-heavy rounded-[2rem] p-6 sm:p-8 border border-border/40 shadow-2xl flex flex-col gap-4">
-              {navLinks.map((link, i) => (
-                <motion.div
-                  key={link.name}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                >
-                  <Link
-                    href={link.href}
-                    onClick={() => handleLinkClick(link.href)}
-                    className={`text-xl font-display font-medium flex items-center justify-between group py-2 ${
-                      activeSection === link.id ? 'text-primary' : 'text-foreground'
-                    }`}
-                  >
-                    {link.name}
-                    <ArrowRight className="opacity-0 group-hover:opacity-100 transform translate-x-[-10px] group-hover:translate-x-0 transition-all text-primary" size={18} />
-                  </Link>
-                </motion.div>
-              ))}
+            <div className="glass-heavy rounded-[2rem] p-5 sm:p-6 border border-border/40 shadow-2xl">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                {navLinks.map((link, i) => {
+                  const Icon = link.icon;
+                  return (
+                    <motion.div
+                      key={link.name}
+                      initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                    >
+                      <Link
+                        href={link.href}
+                        onClick={() => handleLinkClick(link.href)}
+                        className={`flex flex-col p-4 rounded-2xl border backdrop-blur-md transition-all duration-300 group text-left ${
+                          activeSection === link.id
+                            ? 'bg-primary/10 border-primary/40 text-primary shadow-[0_0_15px_rgba(59,130,246,0.15)]'
+                            : 'bg-white/5 border-white/10 hover:border-primary/30 text-foreground hover:bg-white/10'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className={`p-2 rounded-xl transition-colors ${
+                            activeSection === link.id ? 'bg-primary/20 text-primary' : 'bg-white/5 text-muted-foreground group-hover:text-primary group-hover:bg-primary/10'
+                          }`}>
+                            <Icon size={18} />
+                          </div>
+                          <ArrowRight className="opacity-0 group-hover:opacity-100 transform -translate-x-2 group-hover:translate-x-0 transition-all text-primary" size={14} />
+                        </div>
+                        <span className="text-sm font-semibold font-display tracking-tight">{link.name}</span>
+                        <span className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1 group-hover:text-foreground/75 transition-colors">{link.desc}</span>
+                      </Link>
+                    </motion.div>
+                  );
+                })}
+              </div>
             </div>
           </motion.div>
         )}

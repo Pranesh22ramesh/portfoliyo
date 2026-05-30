@@ -162,7 +162,16 @@ function findAnswer(input: string): string {
   return `Great question! Pranesh is a ${RESUME_DATA.title} at Kongu Engineering College with expertise in MERN stack, Python, AWS, DevOps, and Cybersecurity. He has built 5+ real-world projects and holds 6 certifications. What specific area would you like to know more about? Try asking about his projects, skills, education, or certifications!`;
 }
 
-const INITIAL_MESSAGE = "Hi! 👋 I'm Pranesh's AI assistant. I know all about his projects, skills, certifications, and experience from his resume. Ask me anything! Try:\n• What are his projects?\n• What skills does he have?\n• What certifications?\n• How to contact him?";
+import ReactMarkdown from 'react-markdown';
+
+const QUICK_ACTIONS = [
+  { label: '🚀 Projects', query: 'Tell me about your projects.' },
+  { label: '⚙️ Skills', query: 'What are your technical skills?' },
+  { label: '📜 Certifications', query: 'What certifications do you have?' },
+  { label: '📞 Contact', query: 'How can I contact you?' }
+];
+
+const INITIAL_MESSAGE = "Hi! 👋 I'm Pranesh's AI assistant. I know all about his projects, skills, certifications, and experience from his resume. Ask me anything!";
 
 export default function AIChatbot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -171,6 +180,7 @@ export default function AIChatbot() {
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -179,20 +189,98 @@ export default function AIChatbot() {
     }
   }, [messages, isTyping]);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const handleSend = async (overrideInput?: string) => {
+    const textToSend = overrideInput || input;
+    if (!textToSend.trim()) return;
 
-    const userMessage = input.trim();
-    setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
-    setInput('');
+    const userMessage = textToSend.trim();
+    const updatedMessages: { role: 'user' | 'bot'; content: string }[] = [
+      ...messages,
+      { role: 'user', content: userMessage }
+    ];
+
+    setMessages(updatedMessages);
+    if (!overrideInput) setInput('');
     setIsTyping(true);
+    setShowQuickActions(false);
 
-    // Simulate AI thinking delay
-    setTimeout(() => {
-      const response = findAnswer(userMessage);
-      setMessages((prev) => [...prev, { role: 'bot', content: response }]);
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: updatedMessages,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch AI response');
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      if (!reader) {
+        throw new Error('No reader available');
+      }
+
+      // Add empty message for bot's streaming content
+      setMessages((prev) => [...prev, { role: 'bot', content: '' }]);
       setIsTyping(false);
-    }, 800 + Math.random() * 600);
+
+      let botReply = '';
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          if (trimmed.startsWith('data:')) {
+            const dataStr = trimmed.slice(5).trim();
+            if (dataStr === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(dataStr);
+              if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+                botReply += parsed.delta.text;
+                setMessages((prev) => {
+                  const next = [...prev];
+                  if (next.length > 0) {
+                    next[next.length - 1] = {
+                      role: 'bot',
+                      content: botReply,
+                    };
+                  }
+                  return next;
+                });
+              }
+            } catch (e) {
+              // Ignore partial or malformed JSON chunks
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Chat error:', error);
+      // Offline fallback
+      const fallbackReply = findAnswer(userMessage);
+      setMessages((prev) => [
+        ...prev,
+        { role: 'bot', content: `*(Offline Fallback)* ${fallbackReply}` },
+      ]);
+      setIsTyping(false);
+    }
+  };
+
+  const handleActionClick = (query: string) => {
+    handleSend(query);
   };
 
   return (
@@ -233,15 +321,20 @@ export default function AIChatbot() {
             {/* Messages */}
             <div
               ref={scrollRef}
-              className="flex-grow overflow-y-auto px-4 py-4 space-y-3 scroll-smooth"
+              className="flex-grow overflow-y-auto px-4 py-4 space-y-3 scroll-smooth flex flex-col"
               style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}
             >
               {messages.map((msg, i) => (
                 <motion.div
                   key={i}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  initial={{ opacity: 0, scale: 0.85, y: 15 }}
+                  animate={{ 
+                    opacity: 1, 
+                    scale: 1, 
+                    y: 0,
+                    transition: { type: 'spring', stiffness: 260, damping: 20 }
+                  }}
+                  className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
                     className={`max-w-[85%] px-4 py-3 rounded-2xl text-[13px] leading-relaxed whitespace-pre-line ${
@@ -250,7 +343,18 @@ export default function AIChatbot() {
                         : 'bg-white/8 text-white/85 border border-white/8 rounded-bl-md'
                     }`}
                   >
-                    {msg.content}
+                    <ReactMarkdown
+                      components={{
+                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
+                        li: ({ children }) => <li>{children}</li>,
+                        strong: ({ children }) => <strong className="font-bold text-blue-400">{children}</strong>,
+                        a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-300">{children}</a>
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
                   </div>
                 </motion.div>
               ))}
@@ -265,6 +369,21 @@ export default function AIChatbot() {
               )}
             </div>
 
+            {/* Quick Action Chips */}
+            {showQuickActions && (
+              <div className="px-4 py-2 flex flex-wrap gap-2 justify-center border-t border-white/5 bg-white/[0.02]">
+                {QUICK_ACTIONS.map((action) => (
+                  <button
+                    key={action.label}
+                    onClick={() => handleActionClick(action.query)}
+                    className="px-3 py-1.5 rounded-full text-xs bg-white/5 hover:bg-blue-500/20 border border-white/10 hover:border-blue-500/50 text-white/80 hover:text-white transition-all transform active:scale-95 duration-200"
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Input */}
             <div className="px-4 py-3 border-t border-white/8">
               <div className="relative flex items-center">
@@ -277,7 +396,7 @@ export default function AIChatbot() {
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500/50 pr-11 transition-colors placeholder:text-white/25"
                 />
                 <button
-                  onClick={handleSend}
+                  onClick={() => handleSend()}
                   className="absolute right-1.5 w-7 h-7 rounded-lg bg-blue-500 flex items-center justify-center text-white hover:bg-blue-600 transition-colors"
                 >
                   <Send size={14} />
@@ -314,3 +433,4 @@ export default function AIChatbot() {
     </div>
   );
 }
+

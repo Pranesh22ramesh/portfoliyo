@@ -1,12 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Phone, MapPin, Github, Linkedin, Send, X, MessageSquare, CheckCircle2, FileText, Eye, Download } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import emailjs from '@emailjs/browser';
-
-const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
+import { fadeUpVariant, viewportOnce } from '@/lib/AnimationUtils';
 
 const contactInfo = [
   { icon: Mail, label: 'Email', value: 'praneshrsm@gmail.com', href: 'mailto:praneshrsm@gmail.com', color: '#3b82f6' },
@@ -25,26 +23,83 @@ const socials = [
   },
 ];
 
-// EmailJS config - using environment variables for security
-const EMAILJS_SERVICE_ID = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID || 'service_portfolio';
-const EMAILJS_TEMPLATE_ID = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID || 'template_contact';
-const EMAILJS_PUBLIC_KEY = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY || 'YOUR_PUBLIC_KEY';
+const EMAILJS_SERVICE_ID = 'service_portfolio';
+const EMAILJS_TEMPLATE_ID = 'template_contact';
+const EMAILJS_PUBLIC_KEY = 'YOUR_PUBLIC_KEY';
+
+// ── Availability Calendar days builder ──
+const getCalendarDays = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const totalDays = new Date(year, month + 1, 0).getDate();
+
+  const days: (number | null)[] = [];
+  for (let i = 0; i < firstDay; i++) {
+    days.push(null);
+  }
+  for (let i = 1; i <= totalDays; i++) {
+    days.push(i);
+  }
+  return days;
+};
 
 export default function Contact() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
+  const [isResumeHovered, setIsResumeHovered] = useState(false);
 
-  const [animationData, setAnimationData] = useState<any>(null);
+  const calendarDays = getCalendarDays();
+  const currentMonthYear = new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  const todayDate = new Date().getDate();
 
+  // ── Anime.js drawing paper plane on mount ──
   useEffect(() => {
-    import('@/public/animations/hero.json').then(mod => setAnimationData(mod.default));
-  }, []);
+    if (!isFormOpen) return;
+    import('animejs').then((mod) => {
+      const anime = mod.default;
+      const path = document.getElementById('paper-plane-path');
+      if (path) {
+        const length = (path as any).getTotalLength() || 240;
+        path.setAttribute('stroke-dasharray', `${length}`);
+        path.setAttribute('stroke-dashoffset', `${length}`);
+        anime({
+          targets: path,
+          strokeDashoffset: [length, 0],
+          duration: 750,
+          easing: 'easeOutQuad',
+        });
+      }
+    });
+  }, [isFormOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsPending(true);
+
+    const triggerFlyoutAndSuccess = async () => {
+      const path = document.getElementById('paper-plane-path');
+      if (path) {
+        const anime = (await import('animejs')).default;
+        anime({
+          targets: path,
+          translateX: 250,
+          translateY: -250,
+          rotate: 45,
+          opacity: 0,
+          duration: 800,
+          easing: 'easeInBack',
+          complete: () => {
+            setSuccess(true);
+          }
+        });
+      } else {
+        setSuccess(true);
+      }
+    };
 
     try {
       await emailjs.send(
@@ -58,20 +113,19 @@ export default function Contact() {
         },
         EMAILJS_PUBLIC_KEY
       );
-      setSuccess(true);
+      await triggerFlyoutAndSuccess();
     } catch (err) {
-      // Fallback: open mailto if EmailJS not configured yet
       const subject = encodeURIComponent(`Portfolio Contact from ${formData.name}`);
       const body = encodeURIComponent(`Name: ${formData.name}\nEmail: ${formData.email}\n\n${formData.message}`);
       window.open(`mailto:praneshrsm@gmail.com?subject=${subject}&body=${body}`);
-      setSuccess(true);
+      await triggerFlyoutAndSuccess();
     } finally {
       setIsPending(false);
       setTimeout(() => {
         setSuccess(false);
         setIsFormOpen(false);
         setFormData({ name: '', email: '', message: '' });
-      }, 3000);
+      }, 3500);
     }
   };
 
@@ -131,6 +185,7 @@ export default function Contact() {
         </motion.p>
 
         <div className="grid lg:grid-cols-2 gap-12">
+          {/* Left column */}
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -149,7 +204,7 @@ export default function Contact() {
                   viewport={{ once: true }}
                   transition={{ delay: index * 0.1, type: 'spring', stiffness: 300, damping: 20 }}
                   whileHover={{ x: 10, scale: 1.02, y: -5 }}
-                  className="flex items-center gap-4 glass rounded-2xl p-5 border border-border/50 hover:border-primary/60 transition-all group cursor-pointer"
+                  className="flex items-center gap-4 glass rounded-2xl p-5 border border-border/50 hover:border-primary/60 transition-all group cursor-pointer will-change-transform"
                 >
                   <motion.div
                     animate={{ y: [0, -3, 0] }}
@@ -168,8 +223,37 @@ export default function Contact() {
                 </Wrapper>
               );
             })}
+
+            {/* Availability Calendar Chip */}
+            <div className="glass p-5 rounded-2xl border border-white/5 select-none w-full max-w-[280px] mt-6">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-2">Availability Calendar</p>
+              <p className="text-xs font-semibold text-foreground mb-3">Available from {currentMonthYear}</p>
+              
+              <div className="grid grid-cols-7 gap-y-1 gap-x-0.5 justify-items-center">
+                {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
+                  <span key={d} className="text-[8px] font-bold text-muted-foreground/40 w-5 h-5 flex items-center justify-center">
+                    {d}
+                  </span>
+                ))}
+                {calendarDays.map((day, idx) => (
+                  <div
+                    key={idx}
+                    className={`w-5 h-5 text-[9px] flex items-center justify-center ${
+                      day === null
+                        ? 'opacity-0'
+                        : day === todayDate
+                        ? 'bg-primary/20 text-primary font-extrabold rounded-full shadow-[0_0_8px_rgba(59,130,246,0.4)] animate-pulse'
+                        : 'text-muted-foreground'
+                    }`}
+                  >
+                    {day}
+                  </div>
+                ))}
+              </div>
+            </div>
           </motion.div>
 
+          {/* Right column */}
           <motion.div
             initial={{ opacity: 0, x: 30 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -211,13 +295,37 @@ export default function Contact() {
               })}
             </div>
 
-            {/* Resume Access Card */}
+            {/* Resume Access Card with fold corner effect */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="glass rounded-3xl p-6 border border-white/5 relative overflow-hidden group"
+              onMouseEnter={() => setIsResumeHovered(true)}
+              onMouseLeave={() => setIsResumeHovered(false)}
+              className="glass rounded-3xl p-6 border border-white/5 relative overflow-hidden group shadow-[4px_4px_20px_rgba(0,0,0,0.4)]"
             >
+              {/* Fold Corner cuts */}
+              <div
+                className="absolute top-0 right-0 transition-all duration-300 z-20 pointer-events-none"
+                style={{
+                  width: 0,
+                  height: 0,
+                  borderStyle: 'solid',
+                  borderWidth: isResumeHovered ? '0 48px 48px 0' : '0 32px 32px 0',
+                  borderColor: 'transparent hsl(var(--background)) transparent transparent',
+                }}
+              />
+              <div
+                className="absolute top-0 right-0 transition-all duration-300 z-10 pointer-events-none"
+                style={{
+                  width: 0,
+                  height: 0,
+                  borderStyle: 'solid',
+                  borderWidth: isResumeHovered ? '48px 0 0 48px' : '32px 0 0 32px',
+                  borderColor: 'rgba(255,255,255,0.08) transparent transparent rgba(255,255,255,0.08)',
+                }}
+              />
+
               <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-[50px] rounded-full -mr-16 -mt-16" />
               
               <div className="flex items-center gap-4 mb-6">
@@ -232,7 +340,7 @@ export default function Contact() {
 
               <div className="grid grid-cols-2 gap-3">
                 <motion.a
-                  href="/images/resume-preview.png"
+                  href="/resume.pdf"
                   target="_blank"
                   rel="noopener noreferrer"
                   whileHover={{ scale: 1.02 }}
@@ -243,8 +351,9 @@ export default function Contact() {
                   View Full
                 </motion.a>
                 <motion.a
-                  href="/images/resume-preview.png"
-                  download="Pranesh_BR_Resume.png"
+                  id="resume-download"
+                  href="/resume.pdf"
+                  download="Pranesh_Ramesh_Resume.pdf"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   className="flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-primary-foreground transition-all text-sm font-bold shadow-lg shadow-primary/20"
@@ -259,8 +368,21 @@ export default function Contact() {
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => setIsFormOpen(true)}
-              className="flex items-center justify-center gap-3 w-full py-4 rounded-2xl font-semibold text-white relative overflow-hidden group shadow-[0_20px_40px_rgba(59,130,246,0.2)]"
-              style={{ background: 'linear-gradient(135deg, #3b82f6, #0ea5e9)' }}
+              onMouseEnter={async (e) => {
+                const el = e.currentTarget;
+                const anime = (await import('animejs')).default;
+                anime({
+                  targets: el,
+                  backgroundPosition: ['200% center', '-200% center'],
+                  duration: 700,
+                  easing: 'easeInOutQuad',
+                });
+              }}
+              className="flex items-center justify-center gap-3 w-full py-4 rounded-2xl font-semibold text-white relative overflow-hidden group shadow-[0_20px_40px_rgba(59,130,246,0.2)] will-change-transform"
+              style={{
+                background: 'linear-gradient(135deg, #3b82f6, #0ea5e9, #3b82f6)',
+                backgroundSize: '200% auto',
+              }}
             >
               <MessageSquare size={18} />
               <span>Send a Message</span>
@@ -269,17 +391,18 @@ export default function Contact() {
           </motion.div>
         </div>
 
-        {/* Premium Footer */}
+        {/* Premium Footer — AOS fade-up */}
         <motion.footer
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+          variants={fadeUpVariant}
+          initial="hidden"
+          whileInView="visible"
+          viewport={viewportOnce}
           className="mt-24 pt-12 border-t border-white/5"
         >
           <div className="flex flex-col md:flex-row items-center justify-between gap-8">
             <div className="text-center md:text-left">
               <p className="text-2xl font-display font-black gradient-text mb-2">Pranesh.</p>
-              <p className="text-sm text-muted-foreground max-w-xs">Frontend developer building elegant and scalable web experiences.</p>
+              <p className="text-sm text-muted-foreground max-w-xs">Full Stack Developer &middot; Karur, TN</p>
             </div>
             <div className="flex gap-4">
               {socials.map((s) => {
@@ -301,7 +424,7 @@ export default function Contact() {
             </div>
           </div>
           <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-center text-xs text-muted-foreground/60">
-            <p>&copy; {new Date().getFullYear()} Pranesh Ramesh. All rights reserved.</p>
+            <p>&copy; 2025 Pranesh Ramesh. Crafted with React &amp; ☕</p>
           </div>
         </motion.footer>
       </div>
@@ -337,8 +460,19 @@ export default function Contact() {
                 <h3 className="font-display font-bold text-2xl mb-1 text-center">Send a Message</h3>
                 <p className="text-muted-foreground text-sm mb-6 text-center">I&apos;ll get back to you soon!</p>
 
-                <div className="w-24 h-24 mx-auto mb-6">
-                  {animationData && <Lottie animationData={animationData} loop={true} />}
+                {/* Animated Paper Plane SVG */}
+                <div className="w-20 h-20 mx-auto mb-6 flex items-center justify-center relative overflow-visible">
+                  <svg width="80" height="80" viewBox="0 0 80 80" className="overflow-visible block">
+                    <path
+                      id="paper-plane-path"
+                      d="M 15 45 L 65 15 L 45 65 L 37 47 Z M 37 47 L 37 60 L 43 51"
+                      fill="none"
+                      stroke="#3b82f6"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
                 </div>
 
                 <AnimatePresence mode="wait">
@@ -371,7 +505,7 @@ export default function Contact() {
                             value={formData[field.name as keyof typeof formData]}
                             onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
                             placeholder={field.placeholder}
-                            className="w-full px-4 py-3 rounded-xl glass border border-border/60 focus:border-primary/60 outline-none text-sm transition-colors placeholder:text-muted-foreground/50 bg-transparent"
+                            className="w-full px-4 py-3 rounded-xl glass border border-border/60 focus:border-primary/60 outline-none text-sm transition-colors placeholder:text-muted-foreground/50 bg-transparent bg-opacity-0"
                           />
                         </div>
                       ))}
@@ -384,7 +518,7 @@ export default function Contact() {
                           value={formData.message}
                           onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                           placeholder="Tell me about your project..."
-                          className="w-full px-4 py-3 rounded-xl glass border border-border/60 focus:border-primary/60 outline-none text-sm transition-colors placeholder:text-muted-foreground/50 bg-transparent resize-none"
+                          className="w-full px-4 py-3 rounded-xl glass border border-border/60 focus:border-primary/60 outline-none text-sm transition-colors placeholder:text-muted-foreground/50 bg-transparent bg-opacity-0 resize-none"
                         />
                       </div>
                       <motion.button
@@ -409,4 +543,3 @@ export default function Contact() {
     </section>
   );
 }
-

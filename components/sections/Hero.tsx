@@ -10,6 +10,12 @@ import { TypeAnimation } from 'react-type-animation';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Link from 'next/link';
+import {
+  fadeUpVariant,
+  staggerContainer,
+  textRevealVariant,
+  viewportOnce,
+} from '@/lib/AnimationUtils';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -18,34 +24,62 @@ const ParticlesBackground = dynamic(() => import('@/components/ui/ParticlesBackg
   loading: () => null,
 });
 
-export default function Hero() {
-  const containerRef = useRef(null);
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ['start start', 'end start']
-  });
+// ─── Word-level clip-path text reveal ────────────────────────────────────────
+function TextReveal({ text, className = '', delayStart = 0 }: { text: string; className?: string; delayStart?: number }) {
+  const words = text.split(' ');
+  return (
+    <motion.span
+      className={className}
+      initial="hidden"
+      animate="visible"
+      variants={{
+        visible: { transition: { staggerChildren: 0.1, delayChildren: delayStart } },
+        hidden: {},
+      }}
+    >
+      {words.map((word, i) => (
+        <motion.span
+          key={i}
+          variants={textRevealVariant}
+          className="inline-block mr-[0.25em] will-change-transform"
+          style={{ display: 'inline-block' }}
+        >
+          {word}
+        </motion.span>
+      ))}
+    </motion.span>
+  );
+}
 
-  const scale = useTransform(scrollYProgress, [0, 1], [1, 0.8]);
-  const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0]);
-  const y = useTransform(scrollYProgress, [0, 1], [0, 200]);
+export default function Hero() {
+  const containerRef = useRef<HTMLElement>(null);
+
+  // ── Parallax layers ─────────────────────────────────────────────────────────
+  const { scrollYProgress } = useScroll({ target: containerRef, offset: ['start start', 'end start'] });
+  // Foreground content
+  const contentY   = useTransform(scrollYProgress, [0, 1], [0, 180]);
+  const contentScale = useTransform(scrollYProgress, [0, 1], [1, 0.82]);
+  const contentOpacity = useTransform(scrollYProgress, [0, 0.75], [1, 0]);
+  // Background orbs — slower parallax depth
+  const blobY1 = useTransform(scrollYProgress, [0, 1], ['0%', '25%']);
+  const blobY2 = useTransform(scrollYProgress, [0, 1], ['0%', '15%']);
 
   const [isMounted, setIsMounted] = useState(false);
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  useEffect(() => { setIsMounted(true); }, []);
 
+  // ── GSAP stagger reveal ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!isMounted) return;
-
     const ctx = gsap.context(() => {
-      gsap.from('.reveal-item', {
-        y: 50,
+      gsap.from('.hero-reveal-item', {
+        y: 48,
         opacity: 0,
-        duration: 1.2,
-        stagger: 0.2,
+        duration: 1.1,
+        stagger: 0.18,
         ease: 'power4.out',
-        clearProps: 'all' // Crucial: removes the opacity 0 after animation finishes
+        clearProps: 'all',
+        delay: 0.3,
       });
     }, containerRef);
     return () => ctx.revert();
@@ -64,120 +98,97 @@ export default function Hero() {
     >
       <ParticlesBackground />
 
+      {/* ── Background Orbs with Parallax depth ─────────────────────────────── */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <motion.div
-          animate={{
-            opacity: [0.2, 0.5, 0.2],
-            scale: [0.8, 1.2, 0.8],
-            x: [0, 50, 0],
-            y: [0, -50, 0]
-          }}
-          transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute -top-[40%] -left-[20%] w-[1000px] h-[800px] rounded-full blur-[150px]"
-          style={{ background: 'radial-gradient(circle, rgba(59, 130, 246, 0.5), transparent)' }}
-        />
+        <motion.div style={{ y: blobY1 }} className="absolute inset-0">
+          <motion.div
+            animate={{ opacity: [0.2, 0.5, 0.2], scale: [0.8, 1.2, 0.8], x: [0, 50, 0], y: [0, -50, 0] }}
+            transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute -top-[40%] -left-[20%] w-[1000px] h-[800px] rounded-full blur-[150px] will-change-transform"
+            style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.45), transparent)' }}
+          />
+          <motion.div
+            animate={{ opacity: [0.15, 0.4, 0.15], scale: [1, 1.3, 1], x: [0, -40, 0], y: [0, 30, 0] }}
+            transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
+            className="absolute -top-[20%] -right-[15%] w-[900px] h-[700px] rounded-full blur-[140px] will-change-transform"
+            style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.35), transparent)' }}
+          />
+        </motion.div>
 
-        <motion.div
-          animate={{
-            opacity: [0.15, 0.4, 0.15],
-            scale: [1, 1.3, 1],
-            x: [0, -40, 0],
-            y: [0, 30, 0]
-          }}
-          transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
-          className="absolute -top-[20%] -right-[15%] w-[900px] h-[700px] rounded-full blur-[140px]"
-          style={{ background: 'radial-gradient(circle, rgba(139, 92, 246, 0.4), transparent)' }}
-        />
+        <motion.div style={{ y: blobY2 }} className="absolute inset-0">
+          <motion.div
+            animate={{ opacity: [0.2, 0.4, 0.2], scale: [0.9, 1.1, 0.9] }}
+            transition={{ duration: 13, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
+            className="absolute -bottom-[30%] left-1/2 -translate-x-1/2 w-[1200px] h-[800px] rounded-full blur-[160px] will-change-transform"
+            style={{ background: 'radial-gradient(circle, rgba(8,145,178,0.3), transparent)' }}
+          />
+          <motion.div
+            animate={{ rotate: [0, 360], scale: [1, 1.1, 1] }}
+            transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+            className="absolute top-1/4 right-1/3 w-[400px] h-[400px] rounded-full blur-[120px] opacity-25 will-change-transform"
+            style={{ background: 'conic-gradient(from 0deg, rgba(59,130,246,0.5), rgba(139,92,246,0.5), rgba(59,130,246,0.5))' }}
+          />
+        </motion.div>
 
-        <motion.div
-          animate={{
-            opacity: [0.2, 0.4, 0.2],
-            scale: [0.9, 1.1, 0.9]
-          }}
-          transition={{ duration: 13, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
-          className="absolute -bottom-[30%] left-1/2 -translate-x-1/2 w-[1200px] h-[800px] rounded-full blur-[160px]"
-          style={{ background: 'radial-gradient(circle, rgba(8, 145, 178, 0.35), transparent)' }}
-        />
-
-        <motion.div
-          animate={{
-            rotate: [0, 360],
-            scale: [1, 1.1, 1]
-          }}
-          transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-          className="absolute top-1/4 right-1/3 w-[400px] h-[400px] rounded-full blur-[120px] opacity-30"
-          style={{ background: 'conic-gradient(from 0deg, rgba(59, 130, 246, 0.5), rgba(139, 92, 246, 0.5), rgba(59, 130, 246, 0.5))' }}
-        />
-
-        {/* 3D Floating Geometric Shapes */}
+        {/* 3D floating geometric shapes */}
         <motion.div
           animate={{ rotateX: [0, 360], rotateY: [0, 180], y: [0, -30, 0] }}
           transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute top-[15%] right-[10%] w-24 h-24 border border-blue-500/20 rounded-xl"
+          className="absolute top-[15%] right-[10%] w-24 h-24 border border-blue-500/20 rounded-xl will-change-transform"
           style={{ transformStyle: 'preserve-3d' }}
         />
         <motion.div
-          animate={{ rotateZ: [0, 360], y: [0, 20, 0], x: [0, 15, 0], opacity: [0.15, 0.35, 0.15] }}
+          animate={{ rotateZ: [0, 360], y: [0, 20, 0], x: [0, 15, 0], opacity: [0.12, 0.3, 0.12] }}
           transition={{ duration: 22, repeat: Infinity, ease: 'easeInOut', delay: 4 }}
-          className="absolute bottom-[20%] left-[8%] w-16 h-16 border border-purple-500/15 rotate-45"
+          className="absolute bottom-[20%] left-[8%] w-16 h-16 border border-purple-500/15 rotate-45 will-change-transform"
           style={{ transformStyle: 'preserve-3d' }}
         />
         <motion.div
-          animate={{ rotateY: [0, 360], scale: [0.9, 1.1, 0.9], opacity: [0.1, 0.25, 0.1] }}
+          animate={{ rotateY: [0, 360], scale: [0.9, 1.1, 0.9], opacity: [0.08, 0.22, 0.08] }}
           transition={{ duration: 25, repeat: Infinity, ease: 'linear' }}
-          className="absolute top-[60%] right-[20%] w-32 h-32 rounded-full border border-cyan-500/10"
+          className="absolute top-[60%] right-[20%] w-32 h-32 rounded-full border border-cyan-500/10 will-change-transform"
           style={{ transformStyle: 'preserve-3d' }}
         />
         <motion.div
           animate={{ rotateX: [45, 405], rotateZ: [0, 180], y: [0, -25, 0] }}
           transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
-          className="absolute top-[30%] left-[15%] w-10 h-10 border border-blue-400/20 rounded-lg"
+          className="absolute top-[30%] left-[15%] w-10 h-10 border border-blue-400/20 rounded-lg will-change-transform"
           style={{ transformStyle: 'preserve-3d' }}
         />
       </div>
 
+      {/* ── Main content ─────────────────────────────────────────────────────── */}
       <motion.div
-        style={{ scale, opacity, y }}
-        className="relative z-10 w-full max-w-5xl mx-auto flex flex-col items-center text-center"
+        style={{ scale: contentScale, opacity: contentOpacity, y: contentY }}
+        className="relative z-10 w-full max-w-5xl mx-auto flex flex-col items-center text-center px-4 will-change-transform"
       >
 
-
+        {/* Badge + Name */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.5 }}
-          className="reveal-item flex flex-col items-center gap-4 mb-6"
+          transition={{ delay: 0.4, duration: 0.6 }}
+          className="hero-reveal-item flex flex-col items-center gap-4 mb-6"
         >
-          <span className="px-5 py-2 rounded-full glass border border-primary/30 text-primary font-medium text-xs tracking-widest uppercase shadow-[0_0_20px_rgba(59,130,246,0.1)]">
+          <motion.span
+            whileHover={{ scale: 1.05 }}
+            className="px-5 py-2 rounded-full glass border border-primary/30 text-primary font-medium text-xs tracking-widest uppercase shadow-[0_0_20px_rgba(59,130,246,0.12)]"
+          >
             Available for New Projects
-          </span>
+          </motion.span>
+
+          {/* ── Clip-path Text Reveal: Name ─── */}
           <h2 className="text-4xl md:text-5xl lg:text-7xl font-display font-medium text-foreground tracking-tight overflow-hidden py-2">
-            {'Pranesh '.split('').map((char, i) => (
-              <motion.span
-                key={i}
-                initial={{ y: '100%', opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.6 + i * 0.08, duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-                className="inline-block"
-              >
-                {char}
-              </motion.span>
-            ))}
-            {'Ramesh'.split('').map((char, i) => (
-              <motion.span
-                key={i}
-                initial={{ y: '100%', opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 1.3 + i * 0.08, duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-                className="inline-block gradient-text font-bold italic"
-              >
-                {char}
-              </motion.span>
-            ))}
+            <TextReveal text="Pranesh" delayStart={0.5} />
+            {' '}
+            <span className="gradient-text font-bold italic">
+              <TextReveal text="Ramesh" delayStart={1.2} />
+            </span>
           </h2>
         </motion.div>
 
-        <motion.div className="reveal-item mb-8 max-w-4xl min-h-[160px] flex items-center justify-center">
+        {/* Type animation */}
+        <motion.div className="hero-reveal-item mb-8 max-w-4xl min-h-[160px] flex items-center justify-center">
           <TypeAnimation
             sequence={[
               "Hi, I'm Pranesh — Driven Software Systems student with practical experience in web development and UI optimization.",
@@ -189,42 +200,51 @@ export default function Hero() {
             ]}
             wrapper="h1"
             speed={35}
-            className="reveal-item font-display font-bold text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-tight text-balance text-foreground neon-text-glow"
+            className="hero-reveal-item font-display font-bold text-3xl sm:text-4xl md:text-5xl lg:text-6xl leading-tight text-balance text-foreground neon-text-glow"
             repeat={Infinity}
             cursor={true}
           />
         </motion.div>
 
+        {/* Sub-paragraph — Fade Up */}
         <motion.p
-          initial={{ opacity: 0, filter: 'blur(10px)' }}
-          animate={{ opacity: 1, filter: 'blur(0px)' }}
-          transition={{ delay: 1, duration: 1.5, ease: 'easeOut' }}
-          className="reveal-item text-lg md:text-xl text-muted-foreground/90 max-w-3xl mx-auto mb-10 tracking-wide leading-relaxed"
+          variants={fadeUpVariant}
+          initial="hidden"
+          animate="visible"
+          transition={{ delay: 1.0 }}
+          className="hero-reveal-item text-lg md:text-xl text-muted-foreground/90 max-w-3xl mx-auto mb-10 tracking-wide leading-relaxed"
         >
-          Eager to contribute to scalable frontend solutions and cloud-based applications while continually enhancing technical and professional skills in <span className="text-primary font-medium">DevOps</span>, <span className="text-primary font-medium">AI</span>, and <span className="text-primary font-medium">Full-Stack Development</span>.
+          Eager to contribute to scalable frontend solutions and cloud-based applications while continually enhancing technical and professional skills in{' '}
+          <span className="text-primary font-medium">DevOps</span>,{' '}
+          <span className="text-primary font-medium">AI</span>, and{' '}
+          <span className="text-primary font-medium">Full-Stack Development</span>.
         </motion.p>
 
+        {/* Tags — Stagger */}
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.2, duration: 0.8 }}
-          className="reveal-item flex flex-wrap items-center justify-center gap-3 mb-12"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          className="hero-reveal-item flex flex-wrap items-center justify-center gap-3 mb-12"
         >
           {['Student', 'Tamil & English', 'MERN Stack', 'AWS', 'Cybersecurity'].map((item) => (
-            <span
+            <motion.span
               key={item}
-              className="px-4 py-2 rounded-full glass border border-border/50 text-sm text-muted-foreground"
+              variants={fadeUpVariant}
+              whileHover={{ scale: 1.08, y: -2 }}
+              className="px-4 py-2 rounded-full glass border border-border/50 text-sm text-muted-foreground will-change-transform"
             >
               {item}
-            </span>
+            </motion.span>
           ))}
         </motion.div>
 
+        {/* CTA */}
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 1.5, duration: 0.8 }}
-          className="reveal-item flex flex-col sm:flex-row gap-6 justify-center items-center mb-16"
+          className="hero-reveal-item flex flex-col sm:flex-row gap-6 justify-center items-center mb-16"
         >
           <MagneticButton>
             <Link
@@ -233,7 +253,7 @@ export default function Hero() {
                 e.preventDefault();
                 document.querySelector('#projects')?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="reveal-item group relative px-8 py-4 bg-gradient-to-r from-primary via-blue-500 to-primary text-primary-foreground rounded-full font-bold overflow-hidden transition-all hover:scale-110 active:scale-95 shadow-[0_0_30px_rgba(59,130,246,0.4)]"
+              className="group relative px-8 py-4 bg-gradient-to-r from-primary via-blue-500 to-primary text-primary-foreground rounded-full font-bold overflow-hidden transition-all hover:scale-110 active:scale-95 shadow-[0_0_30px_rgba(59,130,246,0.4)] will-change-transform"
             >
               <span className="relative z-10 flex items-center gap-2">
                 View Projects <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
@@ -242,11 +262,10 @@ export default function Hero() {
               <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500" />
             </Link>
           </MagneticButton>
-
-
         </motion.div>
       </motion.div>
 
+      {/* Scroll indicator */}
       <motion.button
         onClick={() => handleScroll('#about')}
         initial={{ opacity: 0 }}
@@ -258,7 +277,7 @@ export default function Hero() {
         <motion.div
           animate={{ y: [0, 10, 0] }}
           transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-          className="w-[1px] h-12 bg-gradient-to-b from-muted-foreground via-red-500 to-transparent"
+          className="w-[1px] h-12 bg-gradient-to-b from-muted-foreground via-red-500 to-transparent will-change-transform"
         />
         <ArrowDown size={16} className="absolute bottom-0 opacity-0 group-hover:opacity-100 transition-all translate-y-4 group-hover:translate-y-8" />
       </motion.button>

@@ -29,20 +29,19 @@ export default function CustomCursor() {
     const handleDown = () => setIsClicking(true);
     const handleUp = () => setIsClicking(false);
 
-    const handleHoverStart = () => setIsHovering(true);
-    const handleHoverEnd = () => setIsHovering(false);
+    const handleMouseOver = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target) return;
+      const isInteractive = target.closest('a, button, [role="button"], [data-cursor-hover], input, textarea, select');
+      setIsHovering(!!isInteractive);
+    };
 
     document.addEventListener('mousemove', handleMove);
     document.addEventListener('mouseleave', handleLeave);
     document.addEventListener('mouseenter', handleEnter);
     document.addEventListener('mousedown', handleDown);
     document.addEventListener('mouseup', handleUp);
-
-    const interactives = document.querySelectorAll('a, button, [data-cursor-hover]');
-    interactives.forEach((el) => {
-      el.addEventListener('mouseenter', handleHoverStart);
-      el.addEventListener('mouseleave', handleHoverEnd);
-    });
+    document.addEventListener('mouseover', handleMouseOver);
 
     // Outer cursor follows with spring lag
     let raf: number;
@@ -65,10 +64,7 @@ export default function CustomCursor() {
       document.removeEventListener('mouseenter', handleEnter);
       document.removeEventListener('mousedown', handleDown);
       document.removeEventListener('mouseup', handleUp);
-      interactives.forEach((el) => {
-        el.removeEventListener('mouseenter', handleHoverStart);
-        el.removeEventListener('mouseleave', handleHoverEnd);
-      });
+      document.removeEventListener('mouseover', handleMouseOver);
     };
   }, []);
 

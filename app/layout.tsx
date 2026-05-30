@@ -6,6 +6,7 @@ import { LenisProvider } from '@/components/providers/LenisProvider';
 import CustomCursor from '@/components/ui/CustomCursor';
 import ScrollProgress from '@/components/ui/ScrollProgress';
 import AIChatbot from '@/components/ui/AIChatbot';
+import AOSProvider from '@/components/providers/AOSProvider';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -52,6 +53,7 @@ export default function RootLayout({
       <body className={`${inter.variable} ${spaceGrotesk.variable} font-sans bg-background text-foreground selection:bg-primary/20`}>
         <ThemeProvider>
           <LenisProvider>
+            <AOSProvider />
             <CustomCursor />
             <ScrollProgress />
             {children}
@@ -68,7 +70,7 @@ export default function RootLayout({
               "name": "Pranesh BR",
               "url": "https://github.com/Pranesh22ramesh",
               "jobTitle": "Frontend Developer",
-              "alumniOf": "Bannari Amman Institute of Technology",
+              "alumniOf": "Kongu Engineering College",
               "knowsAbout": ["Web Development", "Cybersecurity", "AI", "React", "Next.js"],
               "sameAs": [
                 "https://github.com/Pranesh22ramesh",
