@@ -181,7 +181,7 @@ export default function Hero() {
           <h2 className="text-4xl md:text-5xl lg:text-7xl font-display font-medium text-foreground tracking-tight overflow-hidden py-2">
             <TextReveal text="PRANESH" delayStart={0.5} />
             {' '}
-            <span className="gradient-text font-bold italic">
+            <span className="text-blue-400 font-bold italic">
               <TextReveal text="RAMESH" delayStart={1.2} />
             </span>
           </h2>
