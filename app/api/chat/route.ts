@@ -12,9 +12,9 @@ export async function POST(req: Request) {
       return new NextResponse('Anthropic API key is not configured in environment variables.', { status: 500 });
     }
 
-    const systemPrompt = `You are an AI Assistant designed to answer questions about Pranesh BR (Pranesh Ramesh), a Software Systems student at Kongu Engineering College.
+    const systemPrompt = `You are an AI Assistant designed to answer questions about PRANESH RAMESH, a Software Systems student at Kongu Engineering College.
 Here is Pranesh's resume and portfolio details:
-- Name: Pranesh BR
+- Name: PRANESH RAMESH
 - Title: Software Systems Student & Frontend Developer
 - Location: Karur, Tamil Nadu, India
 - Email: praneshrsm@gmail.com

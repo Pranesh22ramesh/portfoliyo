@@ -22,22 +22,22 @@ const spaceGrotesk = Space_Grotesk({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://github.com/Pranesh22ramesh'),
-  title: 'Pranesh BR | Ultra-Premium Portfolio',
+  title: 'PRANESH RAMESH | Ultra-Premium Portfolio',
   description:
-    'Portfolio of Pranesh BR - A passionate frontend developer, cybersecurity enthusiast, and AI explorer building secure, scalable, and beautiful web applications.',
-  keywords: ['Pranesh BR', 'frontend developer', 'cybersecurity', 'React', 'portfolio', 'web developer India'],
-  authors: [{ name: 'Pranesh BR', url: 'https://github.com/Pranesh22ramesh' }],
-  creator: 'Pranesh BR',
+    'Portfolio of PRANESH RAMESH - A passionate frontend developer, cybersecurity enthusiast, and AI explorer building secure, scalable, and beautiful web applications.',
+  keywords: ['PRANESH RAMESH', 'frontend developer', 'cybersecurity', 'React', 'portfolio', 'web developer India'],
+  authors: [{ name: 'PRANESH RAMESH', url: 'https://github.com/Pranesh22ramesh' }],
+  creator: 'PRANESH RAMESH',
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    title: 'Pranesh BR - Developer Portfolio',
+    title: 'PRANESH RAMESH - Developer Portfolio',
     description: 'Frontend Developer, Cybersecurity Enthusiast & AI Explorer',
-    siteName: 'Pranesh BR Portfolio',
+    siteName: 'PRANESH RAMESH Portfolio',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Pranesh BR | Portfolio',
+    title: 'PRANESH RAMESH | Portfolio',
     description: 'Cinematic developer experience.',
     images: ['/og-image.png'],
   },
@@ -67,7 +67,7 @@ export default function RootLayout({
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "Person",
-              "name": "Pranesh BR",
+              "name": "PRANESH RAMESH",
               "url": "https://github.com/Pranesh22ramesh",
               "jobTitle": "Frontend Developer",
               "alumniOf": "Kongu Engineering College",

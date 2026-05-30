@@ -38,7 +38,7 @@ export default function PageLoader() {
 
   if (!isMounted) return null;
 
-  const letters = "PRANESH".split("");
+  const letters = "PRANESH RAMESH".split("");
 
   return (
     <AnimatePresence>
@@ -66,7 +66,7 @@ export default function PageLoader() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.08, duration: 0.5, ease: 'easeOut' }}
               >
-                {letter}
+                {letter === " " ? "\u00A0" : letter}
               </motion.span>
             ))}
           </div>
