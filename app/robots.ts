@@ -1,12 +1,6 @@
-import { MetadataRoute } from 'next';
+import type { MetadataRoute } from 'next';
+import { site } from '@/lib/portfolio';
 
-export default function robots(): MetadataRoute.Robots {
-  return {
-    rules: {
-      userAgent: '*',
-      allow: '/',
-      disallow: '/private/',
-    },
-    sitemap: 'https://pranesh.dev/sitemap.xml',
-  };
+export default function robots():MetadataRoute.Robots {
+  return {rules:{userAgent:'*',allow:'/'},sitemap:site+'/sitemap.xml'};
 }

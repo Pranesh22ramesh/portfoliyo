@@ -1,20 +1,6 @@
-import { MetadataRoute } from 'next';
+import type { MetadataRoute } from 'next';
+import { credentials, projects, site } from '@/lib/portfolio';
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = 'https://pranesh.dev'; // Replace with real domain
-
-  return [
-    {
-      url: baseUrl,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 1,
-    },
-    {
-      url: `${baseUrl}/blog`,
-      lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.8,
-    },
-  ];
+export default function sitemap():MetadataRoute.Sitemap {
+  return ['', '/blog', ...projects.map(p=>'/projects/'+p.id), ...credentials.map(c=>'/credentials/'+c.id)].map(path=>({url:site+path}));
 }

@@ -56,8 +56,8 @@ const markdownStyles = `
   }
 `;
 
-export default async function PostPage({ params }: { params: { slug: string } }) {
-  const post = getPostBySlug(params.slug);
+export default async function PostPage({ params }: { params: Promise<{ slug: string }>  }) {
+  const post = getPostBySlug((await params).slug);
 
   if (!post) return (
     <div className="pt-32 pb-24 px-4 min-h-screen text-center">

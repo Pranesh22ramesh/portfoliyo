@@ -1,140 +1,37 @@
-# 🚀 Pranesh BR - Premium Portfolio
+# Developer World
 
-An award-winning, Awwwards-quality portfolio website featuring stunning 3D visuals, premium animations, and interactive elements.
+Pranesh Ramesh’s software portfolio in an explorable Three.js town. The homepage also serves Recruiter Mode as HTML, with searchable sections and shareable project and credential pages.
 
-## ✨ Features
+## Run locally
 
-- **3D Interactive Hero** - Floating animated sphere with Three.js
-- **Typing Animation** - Dynamic role display
-- **Categorized Skills** - Custom colored progress bars with animations
-- **Interactive Projects** - Gradient cards with modal views
-- **Timeline Education** - Alternating card animations
-- **Achievement Cards** - Icon-based cards with glow effects
-- **Premium Contact** - Animated social links and info cards
-- **Fully Responsive** - Mobile, tablet, and desktop optimized
-- **SEO Optimized** - Complete meta tags and Open Graph support
+Use Node.js 20.9 or later.
 
-## 🛠️ Tech Stack
-
-- **React 18** - Modern UI library
-- **Vite** - Lightning-fast build tool
-- **Three.js** - 3D graphics
-- **@react-three/fiber** - React renderer for Three.js
-- **@react-three/drei** - Useful helpers for Three.js
-- **Framer Motion** - Premium animations
-- **React Type Animation** - Typing effects
-- **Lucide React** - Beautiful icons
-
-## 🚀 Quick Start
-
-```bash
-# Install dependencies
-npm install
-
-# Start development server
+```sh
+npm ci
 npm run dev
+```
 
-# Build for production
+Drive with WASD or the arrow keys. Use Space to brake, F to enter or exit, E to interact, M to open the map, R to reset the vehicle, and Escape for settings. Touch screens get a joystick and action buttons. Recruiter Mode is available at `/#recruiter`.
+
+## Build and verify
+
+```sh
+npm run lint
+npm run typecheck
+npm test -- --runInBand
 npm run build
-
-# Preview production build
-npm run preview
+npm run start
 ```
 
-## 📁 Project Structure
+With the app running, use `npm run test:e2e` and `node scripts/measure-world.mjs`. The browser tools default to localhost port 3000 and accept a `PLAYWRIGHT_BASE_URL`. Install Playwright Chromium with `npx playwright install chromium` if Chrome is unavailable. The measurement script accepts `--mobile`, `--software` and `--throttle`.
 
-```
-src/
-├── components/
-│   ├── Hero.jsx          # Hero section with 3D background
-│   ├── Hero3D.jsx        # Three.js animated sphere
-│   ├── About.jsx         # About section with highlights
-│   ├── Skills.jsx        # Categorized skills with progress bars
-│   ├── Projects.jsx      # Interactive project cards
-│   ├── Education.jsx     # Timeline education cards
-│   ├── Achievements.jsx  # Achievement cards with icons
-│   ├── Contact.jsx       # Contact info and social links
-│   ├── Navbar.jsx        # Floating glass navbar
-│   └── AnimatedSection.jsx # Scroll reveal wrapper
-├── context/
-│   └── ThemeContext.jsx  # Theme management
-├── index.css             # Premium design system
-├── App.jsx               # Main app component
-└── main.jsx              # Entry point
-```
+The default Vercel Next.js preset builds this app. The contact link uses the visitor’s email client. The town plays synthesized audio and the scripted dialogue runs locally without API keys.
 
-## 🎨 Design System
+## Content and assets
 
-### Colors
-- **Primary**: `#a855f7` (Purple)
-- **Secondary**: `#06b6d4` (Cyan)
-- **Accent**: `#f43f5e` (Pink)
-- **Background**: `#030014` (Deep Dark)
+- `lib/portfolio.ts` contains projects, skills, links and credentials.
+- `lib/city.ts` contains the city layout and destinations. `components/city` contains original procedural models, game logic and audio.
+- Certificate artwork belongs to its respective issuers. Published previews come from the supplied documents. The project screenshot comes from the public Twincord portal.
+- `scripts/prepare-resume.py` generates the public résumé. It requires Python with ReportLab. Keep source documents with residential details and private offer letters outside `public`.
 
-### Typography
-- **Headings**: Space Grotesk
-- **Body**: Outfit
-
-### Effects
-- Glassmorphism
-- Gradient text
-- Neon glows
-- Smooth animations
-- 3D transforms
-
-## 📦 Deployment
-
-### Vercel (Recommended)
-```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy
-vercel
-```
-
-### Netlify
-```bash
-# Build command
-npm run build
-
-# Publish directory
-dist
-```
-
-## 🎯 Performance
-
-- **Lighthouse Score**: 95+
-- **First Contentful Paint**: < 1.5s
-- **Time to Interactive**: < 3s
-- **Bundle Size**: Optimized with code splitting
-
-## 📝 Customization
-
-1. **Personal Info**: Update `src/components/Hero.jsx`
-2. **Skills**: Modify `src/components/Skills.jsx`
-3. **Projects**: Edit `src/components/Projects.jsx`
-4. **Colors**: Change CSS variables in `src/index.css`
-5. **SEO**: Update meta tags in `index.html`
-
-## 🌟 Key Highlights
-
-- **Award-Level Design** - Awwwards/Godly.website quality
-- **3D Visuals** - Interactive Three.js sphere
-- **Premium Animations** - Framer Motion throughout
-- **Professional UX** - Smooth transitions and micro-interactions
-- **Recruiter-Ready** - Optimized for job applications
-
-## 📧 Contact
-
-- **Email**: praneshrsm@gmail.com
-- **Phone**: 8300453308
-- **Location**: Karur, Tamil Nadu, India
-
-## 📄 License
-
-MIT License - Feel free to use this as a template for your own portfolio!
-
----
-
-**Built with 💜 by Pranesh BR**
+Verification, measurements and known limits are tracked in `PROGRESS.md`.
