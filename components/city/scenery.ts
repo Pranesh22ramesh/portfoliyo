@@ -6,6 +6,7 @@ type Place = (...shape:Shape)=>void;
 const round = new T.CylinderGeometry(.5,.5,1,10);
 const stones = new T.DodecahedronGeometry(.5);
 const foliage = new T.IcosahedronGeometry(.5,1);
+const dome=new T.SphereGeometry(.5,20,10,0,Math.PI*2,0,Math.PI/2);
 const taper = new T.CylinderGeometry(.25,.5,1,7);
 const trim='#e8d8b7', iron='#283e42', glass='#385f6a';
 
@@ -51,6 +52,14 @@ export function facade(put:Place,d:Exclude<District,{id:'park'}>) {
     put(x,h+.64,z,15.6,.25,13.5,wall);
     put(x-4,h+1,z-2,3.4,.65,2.7,cap);
     put(x+2.6,h+.93,z-1.2,1.7,.49,3.2,'#b9c4bb');
+  }
+  if(d.id==='research'){
+    put(x-3.3,h+.88,z+1.7,4.48,.89,4.49,'#456a69',round);
+    put(x-3.3,h+1.25,z+1.7,4.66,.29,4.67,'#c3c6aa',round);
+    put(x-3.3,h+1.36,z+1.7,4.47,3.82,4.44,'#86a5a2',dome);
+    put(x-3.3,h+1.9,z+3.52,.38,.77,.26,'#3b625f');
+    put(x+4.8,h+1.47,z+2.85,.14,1.65,.14,'#526c5d',round);
+    put(x+5.27,h+2.14,z+2.85,.94,.26,.09,'#d8a567');
   }
   const doorWidth=retail?4.8:2.55;
   put(x,1.59,front,doorWidth+.42,2.78,.26,trim);

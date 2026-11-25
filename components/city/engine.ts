@@ -1,5 +1,6 @@
 import * as T from 'three';
-import { districts, distance, entrance, parkedCars, pets, route, secret, spawn, type District, type DistrictId, type Point } from '@/lib/city';
+import { blocked, districts, distance, entrance, parkedCars, pets, secret, spawn, type District, type DistrictId, type Point } from '@/lib/city';
+import { roadRoute as route } from '@/lib/city-route';
 import { neighbors, type Neighbor } from '@/lib/neighbors';
 import { createMotion, enterExit, step, teleport, type Inputs } from '@/lib/city-motion';
 import { makeContactShadows, skyDome } from './lighting';
@@ -65,7 +66,7 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
     const p=entrance(d); const pin=new T.Mesh(pinGeo,pinMat); pin.position.set(p.x,3.3,p.z); scene.add(pin); return pin;
   });
   const routeMaterial=new T.MeshBasicMaterial({color:'#ffdf58'});
-  const routeSegments=Array.from({length:7},()=>{
+  const routeSegments=Array.from({length:24},()=>{
     const m=new T.Mesh(new T.BoxGeometry(1,.045,.31),routeMaterial); m.visible=false; scene.add(m); return m;
   });
   const shadows=makeContactShadows(2+parkedCars.length+landlords.length+crowds.length+animals.length);
@@ -149,7 +150,7 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
     routeSegments.forEach((m,i)=>{
       const a=line[i],b=line[i+1]; m.visible=Boolean(a&&b);
       if(!a||!b)return;
-      m.position.set((a.x+b.x)/2,.17,(a.z+b.z)/2);
+      m.position.set((a.x+b.x)/2,.171,(a.z+b.z)/2);
       m.scale.x=distance(a,b); m.rotation.y=-Math.atan2(b.z-a.z,b.x-a.x);
     });
   };
@@ -208,17 +209,19 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
         const n=neighbors[i];
         const walking=n.motion==='walk', sitting=n.motion==='sit';
         const phase=time*.39+i*1.7;
-        const dx=walking?Math.sin(phase)*2.55:0;
-        const range=Math.hypot(n.x+dx-pose.x,n.z-pose.z);
+        const patrolX=n.x+(walking?Math.sin(phase)*2.55:0);
+        const canWalk=walking&&!blocked(patrolX,n.z,.44);
+        const npcX=canWalk?patrolX:n.x;
+        const range=Math.hypot(npcX-pose.x,n.z-pose.z);
         const rangeLimit=software?23:quality<.68?32:44;
         p.root.visible=range<rangeLimit;
         if(!p.root.visible)return;
-        p.root.position.set(n.x+dx,sitting?-.14:.18,n.z);
+        p.root.position.set(npcX,sitting?-.14:.18,n.z);
         const detailed=range<(software?10:22);
         const rig=p.setDetail(detailed);
-        p.root.rotation.y=walking?(Math.cos(phase)>0?Math.PI/2:-Math.PI/2):Math.sin(.48*time+i)*.19;
+        p.root.rotation.y=canWalk?(Math.cos(phase)>0?Math.PI/2:-Math.PI/2):Math.sin(.48*time+i)*.19;
         if(rig){
-          animatePerson(rig,time*5+i,walking?.36:.035);
+          animatePerson(rig,time*5+i,canWalk?.36:.035);
           rig.head.rotation.y=Math.sin(time*.72+i)*.17;
           if(sitting){rig.legs[0].rotation.x=-1.2;rig.legs[1].rotation.x=-1.13;rig.knees[0].rotation.x=1.14;rig.knees[1].rotation.x=1.09;}
         }

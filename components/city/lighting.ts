@@ -17,11 +17,11 @@ export function skyDome() {
       void main(){
         vec3 ray=normalize(direction);
         float up=max(0.,ray.y);
-        vec3 horizon=mix(vec3(.60,.72,.75),vec3(.13,.16,.26),night);
-        vec3 zenith=mix(vec3(.12,.36,.55),vec3(.008,.022,.065),night);
+        vec3 horizon=mix(vec3(.59,.69,.68),vec3(.13,.16,.26),night);
+        vec3 zenith=mix(vec3(.103,.34,.53),vec3(.008,.022,.065),night);
         vec3 color=mix(horizon,zenith,smoothstep(-.08,.47,up));
         float sun=max(0.,dot(ray,normalize(vec3(-.51,.51,.65))));
-        color+=vec3(.30,.18,.09)*pow(sun,9.)*(1.-night);
+        color+=vec3(.40,.23,.10)*pow(sun,7.)*(1.-night);
         color+=vec3(.76,.62,.40)*smoothstep(.9984,.9991,sun)*(1.-night);
         gl_FragColor=vec4(color,1.);
         #include <colorspace_fragment>

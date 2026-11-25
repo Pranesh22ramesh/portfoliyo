@@ -62,20 +62,25 @@ test('desktop city controls, map, GPS, progress, paint and photos',async({page},
   expect(errors).toEqual([]);
 });
 
-test('recruiter deep links, search, documents and invalid routes',async({page,request})=>{
-  await page.goto('/#recruiter');
-  await expect(page.locator('canvas')).toHaveCount(0);
-  const search=page.getByRole('searchbox');
+test('in-game directory, deep links, credentials and invalid routes',async({page,request})=>{
+  await page.goto('/#portfolio');
+  const dialog=page.getByRole('dialog');
+  await expect(dialog.getByRole('heading',{name:'Destination directory'})).toBeVisible();
+  await expect(page.locator('#recruiter, .dw-recruiter')).toHaveCount(0);
+  const search=dialog.getByRole('searchbox');
   await search.fill('twincord');
-  await expect(page.locator('#experience')).toContainText('Twincord');
-  await expect(page.locator('#projects')).toHaveCount(0);
+  await expect(dialog.getByRole('button',{name:/IT Park/})).toBeVisible();
+  await expect(dialog.getByRole('button',{name:/Project Lab/})).toHaveCount(0);
   await search.fill('something-unknown');
-  await expect(page.getByText('No matching sections.',{exact:false})).toBeVisible();
+  await expect(dialog.getByText('No matching destinations.',{exact:false})).toBeVisible();
   await search.fill('cisco');
-  await expect(page.locator('#achievements')).toBeVisible();
+  await dialog.getByRole('button',{name:/Achievement Museum/}).click();
+  await expect(dialog.getByRole('heading',{name:'Achievement Museum'})).toBeVisible();
+  expect(new URL(page.url()).hash).toBe('#achievements');
   await page.locator('a[href="/credentials/threat-management"]').click();
-  await expect(page.getByRole('heading',{name:'Cyber Threat Management'})).toBeVisible();
-  await expect(page.getByRole('img')).toBeVisible();
+  await expect(dialog.getByRole('heading',{name:'Cyber Threat Management'})).toBeVisible();
+  expect(new URL(page.url()).hash).toBe('#credential/threat-management');
+  await expect(dialog.getByRole('img')).toBeVisible();
   await expect(page.getByRole('link',{name:'Verify credential'})).toHaveAttribute('href',/credly\.com/);
   await page.getByRole('button',{name:'Fullscreen preview'}).click();
   await expect(page.getByRole('button',{name:'Exit fullscreen'})).toBeVisible();
@@ -84,6 +89,11 @@ test('recruiter deep links, search, documents and invalid routes',async({page,re
   expect((await pdf.body()).subarray(0,5).toString()).toBe('%PDF-');
   await page.goto('/projects/Certificate_Generator');
   await expect(page.getByRole('heading',{name:'Architecture'})).toBeVisible();
+  await page.goto('/#research');
+  await dialog.getByRole('link',{name:'Read case study'}).click();
+  await expect(dialog.getByRole('heading',{name:'API Downtime Analyzer'})).toBeVisible();
+  await dialog.getByRole('button',{name:'Back to destination'}).click();
+  await expect(dialog.getByRole('heading',{name:'Research Center'})).toBeVisible();
   expect((await request.get('/credentials/unknown')).status()).toBe(404);
 });
 
@@ -103,13 +113,14 @@ test('mobile touch controls and layout',async({browser},info)=>{
   const speed = (await page.locator('.dw-speed').boundingBox())!;
   const action = (await page.locator('.dw-game-actions').boundingBox())!;
   expect(speed.y + speed.height).toBeLessThan(action.y);
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(390);
+  const overflow=await page.evaluate(()=>({x:document.documentElement.scrollWidth-innerWidth,y:document.documentElement.scrollHeight-innerHeight}));
+  expect(overflow).toEqual({x:0,y:0});
   await page.getByRole('button',{name:'Settings'}).click();
   console.log('mobile software renderer',await page.getByTestId('world-performance').innerText());
   await context.close();
 });
 
-test('WebGL unavailable falls back to recruiter mode',async({page})=>{
+test('WebGL unavailable keeps the in-game directory accessible',async({page})=>{
   await page.addInitScript(()=>{
     const original=HTMLCanvasElement.prototype.getContext;
     HTMLCanvasElement.prototype.getContext=function(this:HTMLCanvasElement,type:string,...args:unknown[]){
@@ -119,8 +130,10 @@ test('WebGL unavailable falls back to recruiter mode',async({page})=>{
   });
   await page.goto('/');
   await expect(page.getByText('3D is unavailable')).toBeVisible({timeout:20000});
-  await page.getByRole('link',{name:'Open Recruiter Mode'}).click();
-  await expect(page.locator('#university')).toContainText('7.18/10');
+  await page.getByRole('button',{name:'Browse destinations'}).click();
+  const dialog=page.getByRole('dialog');
+  await dialog.getByRole('button',{name:/University/}).click();
+  await expect(dialog).toContainText('7.18/10');
 });
 
 test('first visit intro can be skipped and context loss can recover',async({page})=>{
@@ -143,9 +156,11 @@ test('professional sections render with JavaScript disabled',async({browser})=>{
   const page=await context.newPage();
   await page.goto((process.env.PLAYWRIGHT_BASE_URL??'http://127.0.0.1:3000')+'/#contact');
   await expect(page.locator('#experience')).toContainText('JAC MediaLand');
-  await expect(page.getByRole('link',{name:'Resume',exact:true})).toHaveAttribute('href','/resume.pdf');
+  await expect(page.getByRole('link',{name:'Download Resume',exact:true})).toHaveAttribute('href','/resume.pdf');
+  await page.locator('#contact summary').click();
   await expect(page.getByRole('link',{name:'Email Pranesh'})).toHaveAttribute('href',/^mailto:/);
   await expect(page.locator('#home a[download]')).toHaveAttribute('href','/resume.pdf');
+  expect(await page.evaluate(()=>document.documentElement.scrollHeight)).toBe(await page.evaluate(()=>innerHeight));
   await expect(page.locator('canvas')).toHaveCount(0);
   await context.close();
 });
@@ -168,4 +183,31 @@ test('a nearby neighbor opens their own dialogue',async({page})=>{
   await greeting.click();
   await expect(dialog.getByRole('heading',{name:'Nila'})).toBeVisible();
   await expect(dialog.getByText('Security guard',{exact:true})).toBeVisible();
+});
+
+test('viewport and overlays stay scroll-contained after resize',async({page})=>{
+  await page.goto('/');
+  const world=page.getByRole('region',{name:'Developer World driving game'});
+  await expect(page.getByRole('button',{name:'Exit car'})).toBeVisible({timeout:20000});
+  for(const [width,height] of [[1280,720],[390,844],[844,390],[320,568]]){
+    await page.setViewportSize({width,height});
+    const bounds=(await world.boundingBox())!;
+    expect(bounds).toEqual({x:0,y:0,width,height});
+    await page.evaluate(()=>window.scrollTo(800,800));
+    expect(await page.evaluate(()=>[scrollX,scrollY,document.documentElement.scrollWidth,document.documentElement.scrollHeight])).toEqual([0,0,width,height]);
+  }
+  await page.getByRole('button',{name:'Resume',exact:true}).click();
+  const dialog=page.getByRole('dialog');
+  await expect(dialog.locator('iframe')).toHaveAttribute('src',/resume\.pdf/);
+  const download=page.waitForEvent('download');
+  await dialog.getByRole('link',{name:'Download Resume'}).click();
+  expect((await download).suggestedFilename()).toBe('resume.pdf');
+  await page.keyboard.press('Escape');
+  await page.goto('/#experience');
+  await expect(dialog.getByRole('heading',{name:'IT Park'})).toBeVisible();
+  await expect(dialog).toContainText('Twincord');
+  await dialog.getByRole('button',{name:'All destinations'}).click();
+  await dialog.getByRole('searchbox').fill('wasd');
+  await expect(world.locator('.dw-speed')).toHaveAttribute('aria-label','0 kilometres per hour');
+  expect(await page.evaluate(()=>scrollY)).toBe(0);
 });

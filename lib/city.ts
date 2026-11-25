@@ -41,14 +41,6 @@ export function blocked(x: number, z: number, r: number) {
   if(parkedCars.some(p=>Math.abs(x-p.x)<2.15+r&&Math.abs(z-p.z)<1.2+r))return true;
   return districts.some(d => d.id !== 'park' && Math.abs(x-d.x)<8+r && Math.abs(z-d.z)<7+r);
 }
-export function route(from: Point, district: District): Point[] {
-  const to = parking(district);
-  const nodes = streets.flatMap(z => columns.map(x => ({x,z})));
-  const entry = nodes.reduce((best, p) => distance(p,from)<distance(best,from)?p:best);
-  const end = nodes.reduce((best, p) => distance(p,to)<distance(best,to)?p:best);
-  const first = Math.abs(from.x-entry.x) < Math.abs(from.z-entry.z) ? {x:entry.x,z:from.z} : {x:from.x,z:entry.z};
-  return [from, first, entry, {x:entry.x,z:end.z}, end, {x:to.x,z:end.z}, to, entrance(district)];
-}
 export const stamps = [
   ['projects','Project Explorer'], ['skills','Skill Hunter'], ['research','Research Detective'], ['achievements','Achievement Collector'],
 ] as const;

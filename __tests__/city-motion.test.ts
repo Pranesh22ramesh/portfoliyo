@@ -1,4 +1,5 @@
-import { blocked, districts, entrance, parking, route, spawn } from '@/lib/city';
+import { blocked, districts, entrance, parking, spawn } from '@/lib/city';
+import { roadRoute as route } from '@/lib/city-route';
 import { createMotion, emptyInput, enterExit, step, teleport } from '@/lib/city-motion';
 
 test('bridges cross the river and the river blocks crossing elsewhere',()=>{
@@ -28,4 +29,21 @@ test('acceleration, braking, reverse, exit and reset',()=>{
   expect(m.velocity).toBeLessThan(0);
   teleport(m);
   expect(m.car).toEqual(spawn);
+});
+
+test('GPS reaches every parking bay while avoiding blocked terrain',()=>{
+  for(const target of districts){
+    const points=route(spawn,target);
+    expect(points.length).toBeGreaterThan(2);
+    const bays=points.slice(0,-1);
+    expect(bays[bays.length-1]).toEqual(parking(target));
+    bays.slice(1).forEach((b,i)=>{
+      const a=bays[i];
+      const samples=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.z-a.z)*2));
+      for(let step=0;step<=samples;step++){
+        const t=step/samples;
+        expect(blocked(a.x+(b.x-a.x)*t,a.z+(b.z-a.z)*t,1.7)).toBe(false);
+      }
+    });
+  }
 });

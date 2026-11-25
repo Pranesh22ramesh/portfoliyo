@@ -1,6 +1,7 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { neighborhood } from './neighborhood';
+import { makeFoothills, riverfront } from './riverfront';
 import { headlightPools } from './lighting';
 import { facade, makeSigns, streetscape } from './scenery';
 import { columns, districts, entrance, secret, shop, streets } from '@/lib/city';
@@ -477,6 +478,8 @@ export function town(textured=true) {
   permanent(secret.x,.25,secret.z,1.65,.46,.33,'#4d5661');
   permanent(secret.x,1.39,secret.z-.25,.48,.43,.18,'#ffe08a',ball);
   neighborhood(permanent);
+  riverfront(permanent,textured);
+  root.add(makeFoothills(textured));
   streetscape(permanent);
   root.add(makeSigns());
   const random=(i:number)=>{const v=Math.sin(i*91.492+17.1)*43758.54; return v-Math.floor(v);};

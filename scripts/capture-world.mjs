@@ -27,7 +27,7 @@ for(const mobile of [false,true]){
       await dialog.getByRole('button',{name,exact:true}).last().click();
       await dialog.getByRole('button',{name:'Fast travel'}).click();
       await page.getByRole('button',{name:'Talk',exact:true}).waitFor();
-      if(name==='Fun Park'||name==='University'||name==='Garage'){
+      if(name==='Fun Park'||name==='University'||name==='Garage'||name==='Research Center'){
         await page.getByRole('button',{name:'Photo mode'}).click();
         await dialog.getByRole('slider').first().fill(name==='Fun Park'?'2.8':'2.4');
         await page.waitForTimeout(450);
@@ -61,9 +61,10 @@ for(const mobile of [false,true]){
     await dialog.getByRole('button',{name:'Close panel'}).click();
     await page.waitForTimeout(400);
     await page.screenshot({path:dir+'/'+prefix+'-night.png'});
-    await page.goto(url+'/#recruiter');
+    const fullscreen=await page.getByRole('button',{name:'Destination directory'}).count();
+    await page.goto(url+(fullscreen?'/#portfolio':'/#recruiter'));
     await page.getByRole('searchbox').waitFor();
-    await page.screenshot({path:dir+'/'+prefix+'-recruiter.png'});
+    await page.screenshot({path:dir+'/'+prefix+(fullscreen?'-directory.png':'-recruiter.png')});
   }
   console.log(prefix,mobile?'mobile':'desktop',await page.title(),{errors});
   if(errors.length)process.exitCode=1;

@@ -167,3 +167,53 @@
 .dw-map-button::after{content:'N';position:absolute;top:8px;right:10px;color:#d8e5d1;text-shadow:0 1px 3px #112821;font-size:10px;font-weight:800;pointer-events:none}
 .dw-loader{border-color:#b9a979;box-shadow:0 12px 34px #1128249c}
 @media(prefers-reduced-motion:reduce){.dw-world-title{transition:none}}
+
+/* Full viewport gameplay shell. Only the modal and no-script fallback scroll. */
+html:has(.dw-game),body:has(.dw-game){width:100%;height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
+.dw-game{position:fixed;inset:0;min-height:0;width:100%;height:100dvh;overflow:hidden;overscroll-behavior:none}
+.dw-game .dw-world{width:100%;height:100%;min-height:0;max-height:none;overflow:hidden;touch-action:none;overscroll-behavior:none}
+.dw-game .dw-world-head{top:max(17px,env(safe-area-inset-top));left:max(clamp(15px,3vw,54px),env(safe-area-inset-left));right:max(clamp(15px,3vw,54px),env(safe-area-inset-right))}
+.dw-game .dw-world-title{max-width:560px}
+.dw-game .dw-world h1{font-size:clamp(2.5rem,6vw,6.15rem)}
+.dw-game .dw-hud,.dw-game .dw-game-actions{bottom:max(17px,env(safe-area-inset-bottom))}
+.dw-game .dw-location{top:calc(max(17px,env(safe-area-inset-top)) + 53px)}
+.dw-game .dw-dialog{touch-action:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.dw-game .dw-dialog::backdrop{background:#091a18ba}
+.dw-game .dw-photo::backdrop{background:transparent}
+.dw-atlas-list{list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:13px 0 0;padding:0}
+.dw-atlas-list button{width:100%;height:100%;min-height:62px;align-items:start;flex-direction:column;text-align:left;border-left:3px solid var(--district)}
+.dw-atlas-list span{color:var(--muted);font-size:.83rem;font-weight:500}
+.dw-resume-preview{display:block;width:100%;height:min(65dvh,680px);margin-top:13px;border:1px solid #617669;border-radius:8px;background:#f0eadc}
+.dw-static-portfolio{position:absolute;inset:0;z-index:7;max-width:760px;margin:auto;overflow:auto;overscroll-behavior:contain;padding:clamp(16px,5vw,55px);background:#152b28}
+.dw-static-list{margin-top:18px}
+.dw-static-list details{border:1px solid var(--line);border-radius:8px;padding:8px 13px;margin-bottom:6px;background:#1d3733}
+.dw-static-list summary{cursor:pointer;font-weight:700;padding:5px}
+.dw-static-list small{color:var(--muted);margin-left:6px}
+.dw-static-detail{margin:12px 0}
+@media(max-width:800px){
+ .dw-game .dw-toolbar button{width:42px;padding:0}
+ .dw-game .dw-toolbar span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ .dw-game .dw-world-title{margin-top:62px;max-width:min(74vw,450px)}
+ .dw-game .dw-world h1{font-size:clamp(2.6rem,10.6vw,5rem)}
+ .dw-game .dw-location{top:65px}
+}
+@media(max-height:520px){
+ .dw-game .dw-world-title{margin-top:36px}
+ .dw-game .dw-world h1{font-size:clamp(1.9rem,5vw,3.2rem)}
+ .dw-game .dw-subtitle{display:none}
+ .dw-game .dw-map-button{width:62px}
+ .dw-game .dw-touch .dw-stick{width:80px;height:80px}
+}
+@media(max-width:360px){
+ .dw-game .dw-toolbar{gap:4px}
+ .dw-game .dw-toolbar button{width:38px;min-height:38px}
+ .dw-atlas-list{grid-template-columns:1fr}
+}
+
+@media(max-width:800px){
+ .dw-game .dw-toolbar{position:absolute;top:0;right:0}
+ .dw-game .dw-toolbar button[aria-label="Resume"]{width:auto;padding-inline:9px}
+ .dw-game .dw-toolbar button[aria-label="Resume"] span{position:static;width:auto;height:auto;overflow:visible;clip-path:none;font-size:.78rem}
+}
+
+.dw-game:has(.dw-static-portfolio) .dw-world{display:none}

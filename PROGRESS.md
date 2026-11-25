@@ -1,5 +1,24 @@
 # Developer World progress
 
+## Full-screen game and deployment correction
+
+- [x] Audited production before the change. GitHub contained the roadster update and a retry, but neither had a Vercel status. The public site still exposed the old scrolling Recruiter Mode and returned 404 for the roadster GLB. The last publicly confirmed successful Vercel commit was e94c166. These observations establish a deployment gap. The reason Vercel missed the later GitHub pushes requires authenticated project logs.
+- [x] Replaced the scrolling home layout with a fixed full-viewport game. Reused the ten destination panels for all existing content. Added an in-game search directory, Resume view and download, project case studies, and credential previews. Preserved old hashes and standalone deep links, WebGL recovery, and an internally scrolling no-script directory.
+- [x] Replaced the old straight route with a connected lane graph and shared collision checks. Added mapped buildings, park, pond, waypoints, remaining distance, and arrival indicator.
+- [x] Added sloping foothills, a landscaped river walk, bridge lanterns, flower beds, and an observatory roof. Moved ambient walkers onto sidewalks and checked their movement against solid terrain. Preserved the existing Roadster GLB, photos, character rigs and dialogue.
+- [x] Captured the old production layout and the new local build. Screenshots are in `artifacts/visual-qa/full-screen`.
+- [x] Added tests for no document overflow at four viewport sizes, the full-screen Resume panel, directory fallbacks, modal case studies and credential previews, and GPS clearance across all parking bays.
+
+Final QA: production build, lint, TypeScript, eight Jest and eight Playwright scenarios passed. Firefox also passed in-game search and document containment. The ten-destination screenshot tour reported no browser errors.
+
+| Chrome at spawn | FPS | p95 frame | Controls ready | JS heap |
+| --- | ---: | ---: | ---: | ---: |
+| Intel UHD desktop | 144 | 7 ms | 822 ms | 16 MiB |
+| Intel UHD touch emulation | 144 | 7 ms | 867 ms | 19 MiB |
+| SwiftShader with 4x CPU throttling | 25 | 42 ms | 3.06 s | 19 MiB |
+
+The browser reported 376 kB at spawn. Distant terrain detail was reduced for software rendering. The throttled benchmark remained under 30 FPS. Physical mobile devices and long-session memory were not measured. Art is still stylized 3D game art.
+
 ## Roadster and neighborhood detail pass
 
 - [x] Compared the deployed and local river-town baseline in Chrome at matching viewpoints and visited all ten destinations.

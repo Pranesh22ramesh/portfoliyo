@@ -1,6 +1,6 @@
-import Image from 'next/image';
+import { ProjectDetail } from '@/components/city/PortfolioDetail';
 import { notFound } from 'next/navigation';
-import { projectLink, projects } from '@/lib/portfolio';
+import { projects } from '@/lib/portfolio';
 import '../../world.css';
 
 const aliases:Record<string,string>={'certificate-generator':'Certificate_Generator'};
@@ -11,12 +11,9 @@ export async function generateMetadata({params}:{params:Promise<{id:string}>}){r
 export default async function Project({params}:{params:Promise<{id:string}>}){
   const p=find((await params).id);
   if(!p)notFound();
-  const link=projectLink(p);
   return <main className="dw dw-detail">
     <a href="/#projects">Back to Project Lab</a>
-    <h1>{p.title}</h1><p>{p.stack}</p>
-    {p.image&&<figure className="dw-project-image"><Image src={p.image} alt="Twincord certificate portal sign-in screen" width={1000} height={644}/><figcaption>Public sign-in screen for the certificate portal</figcaption></figure>}
-    <div className="dw-entries">{[ ['Problem',p.problem],['Solution',p.solution],['Architecture',p.architecture],['Evidence',p.result] ].map(([label,content])=><article key={label}><h2>{label}</h2><p>{content}</p></article>)}</div>
-    <a className="dw-button dw-primary" href={link.href}>{link.label}</a>
+    <h1>{p.title}</h1>
+    <ProjectDetail project={p}/>
   </main>;
 }
