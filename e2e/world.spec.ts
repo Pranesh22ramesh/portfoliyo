@@ -10,7 +10,8 @@ test('desktop city controls, map, GPS, progress, paint and photos',async({page},
   page.on('console',e=>{if(e.type()==='error')errors.push(e.text()+' '+e.location().url);});
   await page.goto('/');
   const world=page.getByRole('region',{name:'Developer World driving game'});
-  await expect(world.locator('canvas')).toBeVisible();
+  await expect(world.locator('canvas')).toBeVisible({timeout:15000});
+  await expect(world.locator('canvas')).toHaveAttribute('data-roadster','gltf',{timeout:15000});
   await expect(page.getByRole('button',{name:'Exit car'})).toBeVisible({timeout:20000});
   await world.focus();
   await page.keyboard.down('w');
@@ -50,6 +51,7 @@ test('desktop city controls, map, GPS, progress, paint and photos',async({page},
   await dialog.getByRole('button',{name:'Audio on'}).click();
   await page.keyboard.press('Escape');
   await page.getByRole('button',{name:'Photo mode'}).click();
+  await dialog.getByRole('slider',{name:'Camera zoom'}).fill('2.15');
   const downloaded=page.waitForEvent('download');
   await dialog.getByRole('button',{name:'Download photo'}).click();
   expect((await downloaded).suggestedFilename()).toBe('developer-world.png');
@@ -141,8 +143,29 @@ test('professional sections render with JavaScript disabled',async({browser})=>{
   const page=await context.newPage();
   await page.goto((process.env.PLAYWRIGHT_BASE_URL??'http://127.0.0.1:3000')+'/#contact');
   await expect(page.locator('#experience')).toContainText('JAC MediaLand');
+  await expect(page.getByRole('link',{name:'Resume',exact:true})).toHaveAttribute('href','/resume.pdf');
   await expect(page.getByRole('link',{name:'Email Pranesh'})).toHaveAttribute('href',/^mailto:/);
   await expect(page.locator('#home a[download]')).toHaveAttribute('href','/resume.pdf');
   await expect(page.locator('canvas')).toHaveCount(0);
   await context.close();
+});
+
+test('a nearby neighbor opens their own dialogue',async({page})=>{
+  await page.goto('/');
+  const world=page.getByRole('region',{name:'Developer World driving game'});
+  await expect(page.getByRole('button',{name:'Exit car'})).toBeVisible({timeout:20000});
+  await page.getByRole('button',{name:'Open city map'}).click();
+  const dialog=page.getByRole('dialog');
+  await dialog.getByRole('button',{name:'Garage',exact:true}).last().click();
+  await dialog.getByRole('button',{name:'Fast travel'}).click();
+  await page.getByRole('button',{name:'Exit car'}).click();
+  await expect(page.getByRole('button',{name:'Enter car'})).toBeVisible();
+  await world.focus();
+  await page.keyboard.down('w');
+  const greeting=page.getByTitle('Talk to Nila');
+  try {await expect(greeting).toBeVisible({timeout:10000});}
+  finally {await page.keyboard.up('w');}
+  await greeting.click();
+  await expect(dialog.getByRole('heading',{name:'Nila'})).toBeVisible();
+  await expect(dialog.getByText('Security guard',{exact:true})).toBeVisible();
 });

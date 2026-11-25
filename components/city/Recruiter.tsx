@@ -6,14 +6,15 @@ import { credentials, projects, skillGroups } from '@/lib/portfolio';
 import { Portfolio } from './Portfolio';
 
 const details:Record<string,string> = {
-  home:'Pranesh Ramesh software systems full stack cloud mobile resume',
+  home:'Pranesh Ramesh software systems full stack cloud mobile machine learning cybersecurity resume',
   projects:projects.map(p=>[p.title,p.stack,p.problem,p.solution].join(' ')).join(' '),
   skills:skillGroups.flatMap(g=>[g.title,...g.skills]).join(' '),
   university:'M.Sc. Software Systems Kongu Engineering College CGPA 7.18 Bharani Park',
   experience:'JAC MediaLand Twincord Full Stack Developer Intern Software Developer Intern',
-  achievements:credentials.map(c=>c.title+' '+c.issuer+' '+c.date).join(' ')+' Hackwave',
+  achievements:credentials.map(c=>c.title+' '+c.issuer+' '+c.date).join(' ')+' Hackwave paper presentation Adithya awards',
   research:'API Downtime Analyzer LSTM Autoencoder Sign Language Translator TensorFlow OpenCV',
   contact:'email GitHub LinkedIn Pranesh Ramesh',
+  park:'badminton music movies AI tools hobbies interests pets',
 };
 export function Recruiter(){
   const [query,setQuery]=useState('');

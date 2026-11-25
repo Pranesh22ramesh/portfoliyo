@@ -1,20 +1,21 @@
 import * as T from 'three';
 import { districts, distance, entrance, parkedCars, pets, route, secret, spawn, type District, type DistrictId, type Point } from '@/lib/city';
+import { neighbors, type Neighbor } from '@/lib/neighbors';
 import { createMotion, enterExit, step, teleport, type Inputs } from '@/lib/city-motion';
 import { makeContactShadows, skyDome } from './lighting';
-import { bakeParked, car, disposeWorld, person, town, wildlife } from './models';
+import { bakeParked, car, disposeWorld, person, town, wildlife, type CharacterRig } from './models';
 
 export type Preferences = { quality:'low'|'medium'|'high'; light:'cycle'|'day'|'night'; audio:boolean; color:string; seenIntro:boolean };
 export type Stats = { fps:number; frame:number; draws:number; triangles:number; scale:number };
-export type Snapshot = Point & { angle:number; speed:number; driving:boolean; near:DistrictId|null; pet:number; night:boolean };
+export type Snapshot = Point & { angle:number; speed:number; driving:boolean; near:DistrictId|null; neighbor:number; pet:number; night:boolean };
 export type Game = {
   destroy:()=>void; interact:()=>void; vehicle:()=>void; travel:(d?:District)=>void;
   settings:(p:Preferences)=>void; gps:(d?:District)=>void; pause:(v:boolean)=>void;
-  photo:(angle:number|null)=>void; capture:()=>string; skip:()=>void;
+  photo:(angle:number|null,zoom?:number)=>void; capture:()=>string; skip:()=>void;
 };
 type Events = {
   ready:()=>void; lost:()=>void; update:(s:Snapshot)=>void; stats:(s:Stats)=>void;
-  open:(d:District)=>void; visit:(id:DistrictId)=>void; pet:(index:number)=>void; note:(text:string)=>void;
+  open:(d:District)=>void; visit:(id:DistrictId)=>void; pet:(index:number)=>void; neighbor:(person:Neighbor)=>void; note:(text:string)=>void;
 };
 
 export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, events:Events):Game {
@@ -51,8 +52,9 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
     const place=entrance(d); p.root.position.set(place.x+1.2,.25,place.z);
     scene.add(p.root); return p;
   });
-  const crowds=Array.from({length:12},(_,i)=>{
-    const p=person(['#df8b9d','#5a7fc1','#e2a960','#62ad90'][i%4],i%2?'#b98769':'#e1aa82',i);
+  const crowds=neighbors.map(n=>{
+    const p=person(n.color,n.skin,n.outfit);
+    p.root.position.set(n.x,.14,n.z);
     scene.add(p.root); return p;
   });
   const animals=Array.from({length:8},(_,i)=>{const p=wildlife(i<2?i:i===2?2:i%2?3:4); scene.add(p.root); return p;});
@@ -78,10 +80,40 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
   }
   const target=new T.Vector3(), desired=new T.Vector3(), look=new T.Vector3(), droplet=new T.Object3D();
   camera.position.set(spawn.x+11,13,spawn.z+12);
-  let quality=software?.43:1, paused=false, photo:number|null=null, routeTarget:District|undefined;
+  let quality=software?.43:1, paused=false, photo:number|null=null, photoZoom=1, routeTarget:District|undefined;
   let time=0, intro=prefs.seenIntro?0:3.4, first=true, raf=0, last=0, nextHUD=0, nextGPS=0, previousVisit:DistrictId|null=null;
   let frames=0, sample=0, frameWorst=0, adaptiveCooldown=0, disposed=false, contextLost=false;
-  let latestNear:District|undefined, latestPet=-1, atSecret=false;
+  let latestNear:District|undefined, latestPet=-1, latestNeighbor=-1, atSecret=false;
+  let reflections:T.Texture|undefined,paintNormal:T.Texture|undefined;
+  const meshRequest=new AbortController();
+  const upgradeVehicle=()=>{
+    void import('./roadster').then(async ({loadRoadster,roadsterReflections,paintMicroNormal})=>{
+      if(disposed||contextLost)return;
+      const next=await loadRoadster(meshRequest.signal);
+      if(disposed||contextLost){next.body.dispose();next.glass.dispose();next.roof.dispose();return;}
+      vehicle.paintShell.geometry=next.body;
+      vehicle.paintedRoof.geometry=next.roof;
+      vehicle.paintedRoof.position.set(0,0,0);
+      vehicle.paintedRoof.scale.setScalar(1);
+      if(vehicle.windscreen){
+        vehicle.windscreen.geometry=next.glass;
+        vehicle.windscreen.material.opacity=.44;
+      }
+      if(!software&&prefs.quality!=='low'){
+        reflections=roadsterReflections();
+        paintNormal=paintMicroNormal();
+        vehicle.paint.normalMap=paintNormal;
+        vehicle.paint.normalScale.set(.36,.36);
+        vehicle.paint.envMap=reflections;
+        vehicle.paint.envMapIntensity=.70;
+        vehicle.paint.needsUpdate=true;
+      }
+      renderer.domElement.dataset.roadster='gltf';
+    }).catch(error=>{
+      if(!meshRequest.signal.aborted)console.warn('Using the built-in roadster model.',error);
+    });
+  };
+  const assetTimer=window.setTimeout(upgradeVehicle,500);
   const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if(reduced)intro=0;
 
@@ -102,7 +134,7 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
     camera.updateProjectionMatrix();
   };
   const observer=new ResizeObserver(resize); observer.observe(host); resize();
-  const animatePerson=(p:ReturnType<typeof person>, stride:number, amount:number)=>{
+  const animatePerson=(p:CharacterRig, stride:number, amount:number)=>{
     const swing=Math.sin(stride)*amount;
     p.legs[0].rotation.x=swing; p.legs[1].rotation.x=-swing;
     p.arms[0].rotation.x=-swing*.64; p.arms[1].rotation.x=swing*.64;
@@ -127,16 +159,21 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
     const night=prefs.light==='night'?1:prefs.light==='day'?0:(1-Math.cos(time*.024))/2;
     sky.copy(daySky).lerp(nightSky,night);
     (scene.fog as T.Fog).color.copy(sky);
-    overhead.intensity=1.87-night*1.09; sun.intensity=2.72-night*2.59;
+    overhead.intensity=1.86-night*1.07; sun.intensity=2.92-night*2.77;
+    vehicle.paint.envMapIntensity=.72-night*.51;
     atmosphere.material.uniforms.night.value=night;
     city.bulbs.emissiveIntensity=.03+night*1.65; city.water.uniforms.time.value=reduced?0:time; city.water.uniforms.night.value=night;
     vehicle.lights.visible=night>.43;
     vehicle.root.position.set(motion.car.x,.12,motion.car.z); vehicle.root.rotation.y=motion.car.angle;
 
+    const pace=Math.min(1,Math.abs(motion.velocity)/16);
+    vehicle.root.rotation.z=reduced?0:motion.steering*pace*.024;
+    vehicle.root.rotation.x=reduced?0:Math.sin(time*7)*pace*.0026;
     vehicle.wheels.forEach(({pivot,roller},i)=>{roller.rotation.x=motion.wheels; pivot.rotation.y=i%2?motion.steering*.32:0;});
     driver.root.visible=!motion.driving; driver.root.position.set(motion.player.x,.12,motion.player.z);
     driver.root.rotation.y=motion.player.angle;
-    animatePerson(driver,motion.stride,motion.velocity ? .68 : 0);
+    const driverRig=driver.setDetail(!motion.driving);
+    if(driverRig)animatePerson(driverRig,motion.stride,motion.velocity ? .68 : 0);
     if(!paused && photo===null) {
       city.clouds.forEach((c,i)=>{c.position.x=-65+((15+i*29+time*.65)%160);});
       city.spray.visible=distance({x:60,z:-30},pose)<52;
@@ -159,25 +196,32 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
       landlords.forEach((p,i)=>{
         const range=distance({x:p.root.position.x,z:p.root.position.z},pose);
         p.root.visible=range<50;
-        p.setDetail(range<(software?17:28));
         if(!p.root.visible)return;
+        const rig=p.setDetail(range<(software?14:25));
         p.root.rotation.y=Math.sin(time*.6+i)*.25;
-        p.head.rotation.y=Math.sin(time*.69+i)*.19;
-        p.elbows[1].rotation.x=-.38;
-        p.arms[1].rotation.z=-.12-Math.max(0,Math.sin(time*1.55+i))**8*.82;
+        if(!rig)return;
+        rig.head.rotation.y=Math.sin(time*.69+i)*.19;
+        rig.elbows[1].rotation.x=-.38;
+        rig.arms[1].rotation.z=-.12-Math.max(0,Math.sin(time*1.55+i))**8*.82;
       });
       crowds.forEach((p,i)=>{
-        const x=[-38,-8,22,52,68][i%5], baseZ=i%2===0?-43:38;
-        const sitting=i===8;
-        const walking=i%4!==0;
-        const phase=time*.21+i*1.7;
-        p.root.position.set(sitting?53:x,sitting?-.26:.22,sitting?-22.8:baseZ+(walking?Math.sin(phase)*6:0));
-        p.root.visible=i<(quality<.6||prefs.quality==='low'?5:quality<.8?8:12) && distance({x:p.root.position.x,z:p.root.position.z},pose)<42;
+        const n=neighbors[i];
+        const walking=n.motion==='walk', sitting=n.motion==='sit';
+        const phase=time*.39+i*1.7;
+        const dx=walking?Math.sin(phase)*2.55:0;
+        const range=Math.hypot(n.x+dx-pose.x,n.z-pose.z);
+        const rangeLimit=software?23:quality<.68?32:44;
+        p.root.visible=range<rangeLimit;
         if(!p.root.visible)return;
-        p.setDetail(distance({x:p.root.position.x,z:p.root.position.z},pose)<(software?12:23));
-        p.root.rotation.y=Math.cos(phase)>0?0:Math.PI;
-        animatePerson(p,time*5+i,walking?.45:.04);
-        if(sitting){p.legs[0].rotation.x=-1.2;p.legs[1].rotation.x=-1.13;p.knees[0].rotation.x=1.14;p.knees[1].rotation.x=1.09;}
+        p.root.position.set(n.x+dx,sitting?-.14:.18,n.z);
+        const detailed=range<(software?10:22);
+        const rig=p.setDetail(detailed);
+        p.root.rotation.y=walking?(Math.cos(phase)>0?Math.PI/2:-Math.PI/2):Math.sin(.48*time+i)*.19;
+        if(rig){
+          animatePerson(rig,time*5+i,walking?.36:.035);
+          rig.head.rotation.y=Math.sin(time*.72+i)*.17;
+          if(sitting){rig.legs[0].rotation.x=-1.2;rig.legs[1].rotation.x=-1.13;rig.knees[0].rotation.x=1.14;rig.knees[1].rotation.x=1.09;}
+        }
       });
       animals.forEach((p,i)=>{
         const base=pets[i], a=time*(i<3?.73:.98)+i*1.3;
@@ -185,15 +229,17 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
         p.root.position.set(x+Math.cos(a)*span,i<2?.36:i===2?.11:i%2?5+i*.23:.95+Math.sin(time+i)*.28,z+Math.sin(a)*span*.7);
         p.root.rotation.y=-a+.4;
         p.root.visible=distance({x,z},pose)<61&&(i<3||quality>.72);
+        if(p.root.visible&&p.tail&&!reduced)p.tail.rotation.y=Math.sin(time*5+i)*.51;
         if(p.root.visible)p.limbs.forEach((limb,j)=>{if(i<2)limb.rotation.x=Math.sin(time*6+j*Math.PI/2)*.46;else limb.rotation.z=(j?1:-1)*Math.sin(time*(i===2?3:11))*.66;});
       });
       pins.forEach((pin,i)=>{pin.position.y=3.2+Math.sin(time*2+i)*.24; pin.rotation.y=pose.angle+Math.PI;});
     }
     target.set(pose.x,motion.driving?1.25:1.55,pose.z);
     const aim=photo??pose.angle;
-    const behind=motion.driving?(camera.aspect<.8?11.4:9.5):5.9;
+    const normalDistance=motion.driving?(camera.aspect<.8?11.4:9.5):5.9;
+    const behind=photo===null?normalDistance:normalDistance/photoZoom;
     const introOrbit=intro>0?intro*.56:0;
-    desired.set(pose.x-Math.sin(aim+introOrbit)*(behind+intro*5),motion.driving?5.9+intro*4.6:3.4,pose.z-Math.cos(aim+introOrbit)*(behind+intro*5));
+    desired.set(pose.x-Math.sin(aim+introOrbit)*(behind+intro*5),motion.driving?(photo===null?5.9+intro*4.6:2.05+3.85/photoZoom):(photo===null?3.4:1.48+1.9/photoZoom),pose.z-Math.cos(aim+introOrbit)*(behind+intro*5));
     const buildingAt=(x:number,z:number)=>districts.some(d=>d.id!=='park'&&Math.abs(d.x-x)<8.3&&Math.abs(d.z-z)<7.4);
     for(let fraction=.2;fraction<=1;fraction+=.1){
       if(buildingAt(T.MathUtils.lerp(pose.x,desired.x,fraction),T.MathUtils.lerp(pose.z,desired.z,fraction))){
@@ -227,11 +273,19 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
   const updateHUD=(forced?:District)=>{
     const pose=motion.driving?motion.car:motion.player;
       latestNear=forced??districts.find(d=>distance(entrance(d),pose)<8);
-      latestPet=animals.slice(0,3).findIndex(a=>!motion.driving&&distance({x:a.root.position.x,z:a.root.position.z},pose)<3.2);
+      latestPet=motion.driving?-1:animals.slice(0,3).findIndex(a=>a.root.visible&&distance({x:a.root.position.x,z:a.root.position.z},pose)<3.2);
+      latestNeighbor=-1;
+      if(!motion.driving){
+        let range=2.65;
+        crowds.forEach(({root},i)=>{
+          const nearby=distance({x:root.position.x,z:root.position.z},pose);
+          if(root.visible&&nearby<range){range=nearby;latestNeighbor=i;}
+        });
+      }
       if(latestNear && previousVisit!==latestNear.id)events.visit(latestNear.id);
       atSecret=!motion.driving&&distance(secret,pose)<3.1;
       previousVisit=latestNear?.id??null;
-      events.update({...pose, speed:Math.abs(motion.velocity)*3.6,driving:motion.driving,near:previousVisit,pet:latestPet,night:prefs.light==='night'||(prefs.light==='cycle'&&Math.cos(time*.024)<.12)});
+      events.update({...pose, speed:Math.abs(motion.velocity)*3.6,driving:motion.driving,near:previousVisit,neighbor:latestNeighbor,pet:latestPet,night:prefs.light==='night'||(prefs.light==='cycle'&&Math.cos(time*.024)<.12)});
   };
   const tick=(now:number)=>{
     raf=0;
@@ -266,11 +320,12 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
   document.addEventListener('visibilitychange',sync);
   wake();
   return {
-    destroy(){disposed=true;halt();document.removeEventListener('visibilitychange',sync);observer.disconnect();renderer.domElement.removeEventListener('webglcontextlost',onLoss);disposeWorld(scene);renderer.dispose();renderer.domElement.remove();},
+    destroy(){disposed=true;meshRequest.abort();window.clearTimeout(assetTimer);reflections?.dispose();paintNormal?.dispose();halt();document.removeEventListener('visibilitychange',sync);observer.disconnect();renderer.domElement.removeEventListener('webglcontextlost',onLoss);disposeWorld(scene);renderer.dispose();renderer.domElement.remove();},
     interact(){
       updateHUD();
       if(atSecret){events.note(secret.name+': '+secret.line);return;}
       if(latestPet!==-1){events.pet(latestPet);return;}
+      if(latestNeighbor!==-1){events.neighbor(neighbors[latestNeighbor]);return;}
       if(latestNear){events.open(latestNear);return;}
       events.note('Follow a destination pin or open the city map.');
     },
@@ -279,7 +334,7 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
     settings(value){const changed=prefs.quality!==value.quality; prefs=value;vehicle.paint.color.set(prefs.color);if(changed){quality=software?.43:1;resize();}},
     gps(d){routeTarget=d;refreshRoute(motion.driving?motion.car:motion.player);},
     pause(value){paused=value;sync();},
-    photo(angle){photo=angle;sync();},
+    photo(angle,zoom=1){photo=angle;photoZoom=T.MathUtils.clamp(zoom,1,2.75);sync();},
     capture(){paintFrame(1);return renderer.domElement.toDataURL('image/png');},
     skip(){intro=0;},
   };

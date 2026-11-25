@@ -1,7 +1,7 @@
 import { email } from '@/lib/portfolio';
 
 const replies = [
-  { terms:/resume|résumé|about|profile/i, text:'You can download Pranesh’s [résumé](/resume.pdf) or read his [profile](/#home).' },
+  { terms:/resume|about|profile/i, text:'You can download Pranesh’s [resume](/resume.pdf) or read his [profile](/#home).' },
   { terms:/skill|stack|react|python/i, text:'The [Skill Workshop](/#skills) covers frontend, mobile, backend, cloud and applied ML.' },
   { terms:/project|work|code/i, text:'See the [Project Lab](/#projects) for selected work and GitHub repositories.' },
   { terms:/intern|job|experience/i, text:'Pranesh held internships at JAC MediaLand and Twincord. See [IT Park](/#experience).' },

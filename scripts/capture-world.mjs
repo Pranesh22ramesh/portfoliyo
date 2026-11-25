@@ -29,11 +29,18 @@ for(const mobile of [false,true]){
       await page.getByRole('button',{name:'Talk',exact:true}).waitFor();
       if(name==='Fun Park'||name==='University'||name==='Garage'){
         await page.getByRole('button',{name:'Photo mode'}).click();
-        await dialog.getByRole('slider').fill(name==='Fun Park'?'2.8':'2.4');
+        await dialog.getByRole('slider').first().fill(name==='Fun Park'?'2.8':'2.4');
         await page.waitForTimeout(450);
         const request=page.waitForEvent('download');
         await dialog.getByRole('button',{name:'Download photo'}).click();
         await (await request).saveAs(dir+'/'+prefix+'-'+name.toLowerCase().replaceAll(' ','-')+'.png');
+        if(name==='Garage'&&await dialog.getByRole('slider',{name:'Camera zoom'}).count()){
+          await dialog.getByRole('slider',{name:'Camera zoom'}).fill('2.15');
+          await page.waitForTimeout(450);
+          const closeup=page.waitForEvent('download');
+          await dialog.getByRole('button',{name:'Download photo'}).click();
+          await (await closeup).saveAs(dir+'/'+prefix+'-roadster-closeup.png');
+        }
         await dialog.getByRole('button',{name:'Close panel'}).click();
       }
       await page.getByRole('button',{name:'Talk',exact:true}).click();
@@ -43,7 +50,7 @@ for(const mobile of [false,true]){
     await page.getByRole('button',{name:'Exit car'}).click();
     await page.getByRole('button',{name:'Enter car'}).waitFor();
     await page.getByRole('button',{name:'Photo mode'}).click();
-    await dialog.getByRole('slider').fill('4.1');
+    await dialog.getByRole('slider').first().fill('4.1');
     await page.waitForTimeout(450);
     const walkingPhoto=page.waitForEvent('download');
     await dialog.getByRole('button',{name:'Download photo'}).click();

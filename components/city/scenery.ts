@@ -85,6 +85,27 @@ export function facade(put:Place,d:Exclude<District,{id:'park'}>) {
       put(x+side*7.85,y,z+dz,.065,1.29,1.42,glass);
     }
   }
+  if(style==='office'){
+    for(const floor of [1,2]){
+      const y=1.1+floor*2.13;
+      put(x,y,front+.46,5.15,.19,1.03,'#b8af92');
+      put(x,y+.65,front+.95,5.12,.082,.077,iron);
+      for(let bar=-4;bar<=4;bar++)put(x+bar*.55,y+.355,front+.95,.052,.60,.053,iron);
+      for(const side of [-1,1])put(x+side*2.46,y+.38,front+.56,.078,.60,.075,iron);
+    }
+  }
+  if(style==='lab'){
+    for(const side of [-1,1]){
+      put(x+side*7.81,h*.42,z+.5,.11,h*.72,.21,'#436c6e');
+      for(const dz of [-3,3])put(x+side*7.88,h*.39,z+dz,.13,h*.56,.11,'#739498');
+    }
+  }
+  if(style==='house'){
+    for(const side of [-1,1]){
+      put(x+side*4.65,1.12,front+.26,1.61,.39,.39,'#a8805e');
+      for(let j=-1;j<=1;j++)put(x+side*4.65+j*.39,1.4,front+.29,.44,.34,.47,j===0?'#a0a474':'#788a5c',foliage);
+    }
+  }
   if(civic){
     put(x,3.32,front+.58,10.8,.31,1.24,trim);
     put(x,3.49,front+.57,11.2,1.12,1.3,cap,gable);

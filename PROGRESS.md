@@ -1,5 +1,27 @@
 # Developer World progress
 
+## Roadster and neighborhood detail pass
+
+- [x] Compared the deployed and local river-town baseline in Chrome at matching viewpoints and visited all ten destinations.
+- [x] Authored and loaded a 39 kB Roadster GLB with a curved body, roof, glazing, reflective paint and a generated normal texture. Reworked wheels, mirror mounts and vehicle lean. The built-in mesh remains available if the GLB cannot load. Regenerate with `node scripts/build-world-assets.mjs`.
+- [x] Rebuilt the detailed character geometry into a single skinned mesh per character with weighted arms and legs. Nearby rigs are created on demand and culled against the camera bounds; distant characters use simpler geometry. Added twelve neighbors with roles, sidewalk activity and individual walk-up dialogue.
+- [x] Added cafe furniture, parasols, planters, fences, balconies and bicycle frames. Expanded tree silhouettes, added animated pet tails and directional glints on the water, and retained the existing river, bridge, park and road layout.
+- [x] Added a photo zoom control, a less obstructive title while playing, a compass indicator, and updated dialogue styling. Fixed the roof overlap and headlights identified in the close-ups.
+- [x] Changed visible labels to Resume. Checked the public PDF and integrated the missing paper presentation award. The site retains 7.18/10 CGPA, the past JAC MediaLand and Twincord roles, credential previews, portfolio links, leadership and contact.
+- [x] No new third-party asset licenses. The GLB, shaders, normal and reflection textures and other scene additions are original. Retained the user-provided certificate artwork as before.
+
+Final production build, lint, type checks, seven Jest tests and seven Playwright scenarios passed. The browser captured all ten destinations and the roadster close-up on the final build. No page or console errors were captured in the tour.
+
+| Chrome at spawn | FPS | p95 frame | Controls ready | JS heap |
+| --- | ---: | ---: | ---: | ---: |
+| Intel UHD desktop | 144 | 7 ms | 1.26 s | 16 MiB |
+| Intel UHD touch emulation | 144 | 7 ms | 0.76 s | 16 MiB |
+| SwiftShader, 4x CPU throttling | 27 | 42 ms | 3.05 s | 14 MiB |
+
+Resource transfer was about 470 kB. Relative to the river-town baseline of 417 kB, the increase includes the new GLB and its lazy loader. The software simulation remained below 30 FPS even with adaptive rendering. Physical mobile performance, battery consumption and long-session memory remain unmeasured.
+
+See `artifacts/visual-qa/film` for before and after captures. The quality is still stylized game art, with procedural architecture and animals. Neither film-level richness around the entire map nor physical device performance is established. LinkedIn restricted automated access. Initial QA ran against a local production build.
+
 ## River town visual upgrade
 
 - [x] Captured the deployed baseline and latest local baseline in Chrome at matching viewpoints. Recruiter and mobile baseline captures matched visually. Desktop and park captures differed slightly due to animation timing. Walked the browser through all ten named destinations using fast travel and opened each corresponding host panel.
@@ -21,7 +43,7 @@ Final Chrome measurements at spawn, after adaptation:
 
 The browser reported about 417 kB of resource transfers. The final distance and quality changes improved the software result from 20 FPS in the previous art pass to 26 FPS. The earlier baseline measured 28 FPS under the software simulation. The final version remains short of the 30 FPS goal in that test. Software startup and frame times vary significantly while the scene compiles.
 
-The upgraded build has not been pushed or deployed. Unverified areas include physical phone performance, battery and GPU-memory use, sustained play sessions, and exhaustive animation and collision inspection. The art remains low-poly and uses procedural geometry and materials rather than imported GLB assets, normal maps, or skinned facial rigs.
+The river-town build was later deployed as e94c166. Unverified areas include physical phone performance, battery and GPU-memory use, sustained play sessions, and exhaustive animation and collision inspection. The art remains low-poly and uses procedural geometry and materials rather than imported GLB assets, normal maps, or skinned facial rigs.
 
 ## Scope delivered
 

@@ -1,5 +1,6 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { neighborhood } from './neighborhood';
 import { headlightPools } from './lighting';
 import { facade, makeSigns, streetscape } from './scenery';
 import { columns, districts, entrance, secret, shop, streets } from '@/lib/city';
@@ -11,6 +12,11 @@ const oval = new T.SphereGeometry(.5,10,6);
 const bevel = new T.CylinderGeometry(.38,.5,1,10);
 const cone = new T.ConeGeometry(.5,1,7);
 const tube = new T.CylinderGeometry(.5,.5,1,12);
+const tireProfile=new T.LatheGeometry([
+  new T.Vector2(.30,-.49),new T.Vector2(.433,-.49),new T.Vector2(.485,-.32),
+  new T.Vector2(.50,-.17),new T.Vector2(.50,.17),new T.Vector2(.485,.32),
+  new T.Vector2(.433,.49),new T.Vector2(.30,.49),
+],22);
 // The body and canopy use bevelled cross sections along the vehicle's length.
 function loft(sections:number[][]) {
   const rings=sections.map(([z,width,low,high])=>[
@@ -52,7 +58,7 @@ townPaint.onBeforeCompile = (shader) => {
     diffuseColor.rgb *= 1.+(grain-.5)*.094*fade+(broad-.5)*.044;`
   );
 };
-const sharedGeometries = new Set<T.BufferGeometry>([box,ball,lowBall,oval,bevel,cone,tube,body,glass]);
+const sharedGeometries = new Set<T.BufferGeometry>([box,ball,lowBall,oval,bevel,cone,tube,tireProfile,body,glass]);
 const materials = new Map<string,T.MeshStandardMaterial>();
 function material(color:string) {
   let result = materials.get(color);
@@ -111,20 +117,19 @@ export function car(color:string, showCabin=false) {
   const paint=new T.MeshPhysicalMaterial({color,roughness:.29,metalness:.31,clearcoat:.68,clearcoatRoughness:.22});
   const chassis=new T.Group(), detail=new T.Group(); root.add(chassis,detail);
   pieces(chassis,[
-    [0,.56,0,2.16,.39,4.3,'#202737'],
+    [0,.33,0,1.77,.215,3.93,'#202737'],
     [0,0,0,1,1,1,color,body],
     [0,1.62,-.37,1.35,.055,.84,color], [0,.54,2.15,1.76,.12,.14,'#121e23'],
-    [-1.09,.73,-.42,.11,.29,.84,'#222c3d'],[1.09,.73,-.42,.11,.29,.84,'#222c3d'],
-    [-1.02,1.1,.52,.32,.15,.27,color],[1.02,1.1,.52,.32,.15,.27,color],
-    [0,1.32,-1.97,2.3,.1,.42,'#263247'], [0,1.12,-1.93,1.24,.36,.1,'#263247'],
-    [-.68,.7,2,.45,.09,.14,'#f1faff'], [.68,.7,2,.45,.09,.14,'#f1faff'],
+    [-1.044,.694,-.54,.09,.105,.51,'#263737'],[1.044,.694,-.54,.09,.105,.51,'#263737'],
+    [-1.12,1.071,.49,.293,.112,.225,color,oval],[1.12,1.071,.49,.293,.112,.225,color,oval],
+    [0,1.28,-1.97,2.1,.065,.32,'#263247'], [-.61,1.145,-1.92,.09,.245,.117,'#263247'], [.61,1.145,-1.92,.09,.245,.117,'#263247'],
     [-.69,.89,-2.1,.59,.085,.09,'#ff4f72'], [.69,.89,-2.1,.59,.085,.09,'#ff4f72'],
   ]);
   pieces(detail,[
     [0,.44,-2.14,1.82,.19,.15,'#172326'],[0,.73,-2.105,1.71,.25,.12,'#202e32'],
     [0,.68,-2.19,.56,.19,.06,'#f2dab2'],[0,.69,-2.224,.33,.026,.007,'#4f6c68'],
     [0,.91,-2.07,.15,.055,.018,'#e5b677'],[0,.78,1.64,.14,.04,.18,'#dfb46f'],
-    [0,.46,2.2,1.9,.072,.18,'#25393a'],[0,1.33,-1.99,1.9,.055,.30,'#364f4c'],
+    [0,.46,2.2,1.9,.072,.18,'#25393a'],[0,1.317,-1.986,1.96,.018,.234,'#364f4c'],
   ]);
   for(const side of [-1,1]){
     pieces(detail,[
@@ -132,13 +137,15 @@ export function car(color:string, showCabin=false) {
       [side*.42,.9,-2.143,.29,.035,.024,'#ff926f'],
       [side*.76,.53,-2.22,.23,.14,.18,'#899892',tube,0],
       [side*.98,.69,-2.11,.1,.26,.11,'#121b20'],
-      [side*.79,.68,1.97,.47,.045,.27,'#f9eabb',box,side*.25],
+      [side*.77,.704,1.91,.39,.035,.275,'#e6f0e3',oval,side*.24],
       [side*.93,.48,1.99,.31,.10,.19,'#253739',box,side*.28],
-      [side*1.09,.42,0,.12,.13,2.18,'#213338'],
-      [side*1.126,1.11,.57,.12,.08,.18,'#bdcecc'],
+      [side*1.035,.42,0,.108,.072,1.88,'#213338'],
+      [side*1.14,1.072,.414,.185,.061,.087,'#bdcecc',oval],
+      [side*1.008,1.023,.49,.23,.065,.072,'#293b3d',oval],
       [side*.66,1.12,-1.58,.064,.035,.2,'#273c3c'],
     ]);
   }
+  let windscreen:T.Mesh<T.BufferGeometry,T.MeshStandardMaterial>|undefined;
   if(showCabin){
     const interior=new T.Group();root.add(interior);
     for(const side of [-1,1]){
@@ -153,11 +160,13 @@ export function car(color:string, showCabin=false) {
     const steering=new T.Mesh(new T.TorusGeometry(.15,.023,6,16),material('#293e40'));
     steering.position.set(-.35,1.35,.22);steering.rotation.x=-.37;interior.add(steering);
     collapse(interior);steering.geometry.dispose();
-    const windscreen=new T.Mesh(glass,new T.MeshStandardMaterial({color:'#497f90',transparent:true,opacity:.38,depthWrite:false,roughness:.14,metalness:.19}));
+    windscreen=new T.Mesh(glass,new T.MeshStandardMaterial({color:'#497f90',transparent:true,opacity:.38,depthWrite:false,roughness:.14,metalness:.19}));
     root.add(windscreen);
   }else pieces(detail,[[0,0,0,1,1,1,'#355866',glass]]);
   collapse(detail);
   chassis.children.forEach(child=>{const m=child as T.Mesh;if(m.material===material(color))m.material=paint;});
+  const paintedRoof=chassis.children.find(child=>child instanceof T.Mesh&&child.position.y===1.62) as T.Mesh<T.BufferGeometry,T.MeshPhysicalMaterial>;
+  const paintShell=chassis.children.find(child=>child instanceof T.Mesh&&child.geometry===body) as T.Mesh<T.BufferGeometry,T.MeshPhysicalMaterial>;
   const fixed=new T.Group(); chassis.add(fixed);
   for(const child of [...chassis.children]){
     if(child instanceof T.Mesh && child.material!==paint)fixed.add(child);
@@ -169,7 +178,8 @@ export function car(color:string, showCabin=false) {
     const roller=new T.Group(); pivot.add(roller);
     const side=Math.sign(x);
     for(const [r,w,c,off] of [[.86,.37,'#192426',0],[.68,.027,'#3b4847',side*.198],[.56,.034,'#7e9291',side*.215],[.43,.033,'#343e41',side*.234],[.16,.07,'#bdc7bd',side*.258]] as const){
-      const tire=mesh([off,0,0,r,w,r,c,tube]); tire.rotation.z=Math.PI/2; roller.add(tire);
+      const tread=showCabin&&r===.86?tireProfile:tube;
+      const tire=mesh([off,0,0,r,w,r,c,tread]); tire.rotation.z=Math.PI/2; roller.add(tire);
     }
     for(let i=0;i<7;i++){
       const a=i/7*Math.PI*2;
@@ -180,9 +190,9 @@ export function car(color:string, showCabin=false) {
     collapse(roller); wheels.push({pivot,roller});
   }
   const lights=showCabin?headlightPools():new T.Group();root.add(lights);
-  return {root,wheels,paint,lights};
+  return {root,wheels,paint,lights,paintShell,paintedRoof,windscreen};
 }
-export function person(color:string, skin:string, style=0) {
+function makePersonRig(color:string, skin:string, style:number) {
   const root=new T.Group(), head=new T.Group();
   const dark=['#314747','#51423c','#323741','#465850'][style%4];
   const hair=['#2f302b','#4a3330','#4d3b32','#1e2e32'][style%4];
@@ -216,6 +226,15 @@ export function person(color:string, skin:string, style=0) {
   }else{
     pieces(head,[[-.14,.193,.135,.19,.166,.149,hair,oval],[.039,.225,.126,.29,.13,.159,hair,oval]]);
   }
+  if(style===4||style===8){
+    pieces(head,[[0,.139,-.20,.45,.355,.25,hair,oval],[.19,.08,-.108,.12,.31,.16,hair,oval],[0,.215,-.235,.26,.26,.23,hair,oval]]);
+    pieces(root,[[0,1.46,.116,.40,.12,.197,'#d3b18b',oval]]);
+  }
+  if(style===5){
+    pieces(root,[[0,1.18,.169,.41,.53,.11,'#d0a273',oval],[0,1.065,.213,.27,.12,.046,'#543e36',oval]]);
+  }
+  if(style===7)pieces(root,[[0,1.44,.182,.118,.23,.045,'#d4b582'],[.154,1.39,.189,.09,.063,.028,'#e4c37a']]);
+  if(style===9)pieces(root,[[0,1.12,-.243,.48,.47,.26,'#a36a45'],[0,1.32,-.376,.45,.073,.049,'#dfac6e']]);
   if(style%4===2)pieces(root,[[0,1.24,-.218,.47,.43,.24,'#9e673e',oval],[0,1.37,-.32,.33,.24,.08,'#67493a',oval]]);
   const legs:T.Group[]=[], arms:T.Group[]=[], knees:T.Group[]=[], elbows:T.Group[]=[];
   for(const side of [-1,1]){
@@ -230,25 +249,87 @@ export function person(color:string, skin:string, style=0) {
     const elbow=new T.Group();elbow.position.y=-.267;arm.add(elbow);
     pieces(elbow,[[0,-.114,0,.146,.273,.145,skin,oval],[0,-.25,.007,.161,.172,.142,skin,oval],
       [-side*.059,-.229,.06,.067,.103,.069,skin,oval]]);
+    for(let finger=0;finger<3;finger++){
+      pieces(elbow,[[side*(finger-1)*.032,-.302+Math.abs(finger-1)*.008,.039,.029,.056,.051,skin,lowBall]]);
+    }
     arms.push(arm);elbows.push(elbow);
   }
-  collapse(root);collapse(head);[...legs,...knees,...arms,...elbows].forEach(collapse);
-  const detailed=new T.Group();
-  for(const child of [...root.children])detailed.add(child);
+  root.updateMatrixWorld(true);
+  const groups=[root,head,...legs,...knees,...arms,...elbows];
+  const bones=groups.map(group=>{
+    const bone=new T.Bone();
+    bone.position.copy(group.position);
+    return bone;
+  });
+  for(let i=1;i<groups.length;i++){
+    const parent=groups.indexOf(groups[i].parent as T.Group);
+    bones[Math.max(parent,0)].add(bones[i]);
+  }
+  const skinParts:T.BufferGeometry[]=[];
+  groups.forEach((group,boneIndex)=>{
+    const parentIndex=Math.max(0,groups.indexOf(group.parent as T.Group));
+    for(const child of group.children){
+      if(!(child instanceof T.Mesh))continue;
+      const geometry=coloredGeometry(child,child.matrixWorld);
+      const positions=geometry.getAttribute('position');
+      const indices=new Uint16Array(positions.count*4);
+      const weights=new Float32Array(positions.count*4);
+      const flexible=knees.includes(group)||elbows.includes(group);
+      const origin=group.getWorldPosition(new T.Vector3());
+      for(let i=0;i<positions.count;i++){
+        const parentWeight=flexible?.55*T.MathUtils.smoothstep(positions.getY(i)-origin.y,-.100,.02):0;
+        indices[i*4]=boneIndex;
+        indices[i*4+1]=parentIndex;
+        weights[i*4]=1-parentWeight;
+        weights[i*4+1]=parentWeight;
+      }
+      geometry.setAttribute('skinIndex',new T.Uint16BufferAttribute(indices,4));
+      geometry.setAttribute('skinWeight',new T.Float32BufferAttribute(weights,4));
+      skinParts.push(geometry);
+    }
+  });
+  const geometry=combine(skinParts);
+  if(!geometry)throw new Error('Character mesh is missing');
+  const actor=new T.SkinnedMesh(geometry,vertexPaint);
+  actor.add(bones[0]);
+  actor.updateMatrixWorld(true);
+  actor.bind(new T.Skeleton(bones));
+  geometry.computeBoundingSphere();
+  actor.boundingSphere=geometry.boundingSphere?.clone()??new T.Sphere(new T.Vector3(0,1,0),1.2);
+  actor.boundingSphere.radius+=.34;
+  const bone=(group:T.Group)=>bones[groups.indexOf(group)];
+  return {actor,head:bone(head),legs:legs.map(bone),knees:knees.map(bone),arms:arms.map(bone),elbows:elbows.map(bone)};
+}
+
+export type CharacterRig = ReturnType<typeof makePersonRig>;
+export function person(color:string, skin:string, style=0){
+  const root=new T.Group();
+  const pants=['#314747','#51423c','#323741','#465850'][style%4];
+  const hair=['#2f302b','#4a3330','#4d3b32','#1e2e32'][style%4];
+  const uniform=style%4===1?'#303d3c':color;
   const distant=new T.Group();
   pieces(distant,[
     [0,1.25,0,.56,.67,.36,uniform,ball],[0,1.79,0,.45,.48,.40,skin,ball],
-    [0,2.01,-.05,.47,.153,.41,hair,ball],[.14,.5,0,.23,.88,.27,dark,lowBall],
-    [-.14,.5,0,.23,.88,.27,dark,lowBall],[-.335,1.21,0,.18,.5,.19,uniform,lowBall],
+    [0,2.01,-.05,.47,.153,.41,hair,ball],[.14,.5,0,.23,.88,.27,pants,lowBall],
+    [-.14,.5,0,.23,.88,.27,pants,lowBall],[-.335,1.21,0,.18,.5,.19,uniform,lowBall],
     [.335,1.21,0,.18,.5,.19,uniform,lowBall],
   ]);
-  collapse(distant);distant.visible=false;
-  root.add(detailed,distant);
-  return {root,head,legs,arms,knees,elbows,setDetail(near:boolean){detailed.visible=near;distant.visible=!near;}};
-
+  collapse(distant);
+  root.add(distant);
+  let rig:CharacterRig|undefined;
+  return {
+    root,
+    setDetail(near:boolean){
+      distant.visible=!near;
+      if(near&&!rig){rig=makePersonRig(color,skin,style);root.add(rig.actor);}
+      if(rig)rig.actor.visible=near;
+      return near?rig:undefined;
+    },
+  };
 }
 export function wildlife(kind:number) {
   const root=new T.Group(); const limbs:T.Group[]=[];
+  const tail=kind<2?new T.Group():undefined;
   const c=['#b86c43','#ed9a55','#ffe46d','#e8f4fc','#ac7bff'][kind];
   if(kind<2){
     pieces(root,[
@@ -256,8 +337,14 @@ export function wildlife(kind:number) {
       [0,.76,.57,kind===0?.51:.42,.43,.45,c,oval],
       [0,.68,.773,kind===0?.27:.19,.166,kind===0?.29:.17,'#e3b68a',oval],
       [0,.716,kind===0?.907:.851,.105,.072,.08,'#303535',oval],
-      [0,.70,-.65,.11,.40,.105,c,bevel],
     ]);
+    if(tail){
+      tail.position.set(0,.59,-.61);
+      const curve=new T.CatmullRomCurve3([new T.Vector3(0,0,0),new T.Vector3(0,.10,-.12),new T.Vector3(0,.25,-.19),new T.Vector3(.025,kind===0?.35:.41,-.14)]);
+      const geometry=new T.TubeGeometry(curve,8,kind===0?.054:.045,5,false);
+      const tuft=mesh([0,0,0,1,1,1,kind===0?'#936147':c,geometry]);
+      tail.add(tuft);collapse(tail);geometry.dispose();root.add(tail);
+    }
     if(kind===0)pieces(root,[[0,.606,.43,.46,.093,.37,'#5b867e',oval],[0,.55,.599,.098,.117,.043,'#e3b65c',oval]]);
     else for(const side of [-1,1])pieces(root,[[side*.137,.744,.65,.041,.164,.183,'#bd743c',oval]]);
 
@@ -291,7 +378,7 @@ export function wildlife(kind:number) {
     }
   }
   collapse(root); limbs.forEach(collapse);
-  return {root,limbs};
+  return {root,limbs,tail};
 }
 
 export function town(textured=true) {
@@ -389,18 +476,7 @@ export function town(textured=true) {
   permanent(secret.x,.88,secret.z-.3,2.3,.42,.12,'#cc8c56');
   permanent(secret.x,.25,secret.z,1.65,.46,.33,'#4d5661');
   permanent(secret.x,1.39,secret.z-.25,.48,.43,.18,'#ffe08a',ball);
-  for(const [x,z] of [[5,41],[-23,-51],[51,-27]]){
-    for(const side of [-1,1]){
-      const ring=new T.TorusGeometry(.41,.064,5,14);
-      permanent(x+side*.58,.48,z,1,1,1,'#293449',ring);
-      ring.dispose();
-    }
-    const tilt=new T.BoxGeometry(1,1,1).rotateZ(Math.PI/4);
-    permanent(x,.79,z,.8,.65,.085,'#ea845e',tilt);
-    tilt.dispose();
-    permanent(x+.45,1.06,z,.12,.48,.13,'#455a67');
-    permanent(x+.46,1.24,z,.36,.08,.24,'#455a67');
-  }
+  neighborhood(permanent);
   streetscape(permanent);
   root.add(makeSigns());
   const random=(i:number)=>{const v=Math.sin(i*91.492+17.1)*43758.54; return v-Math.floor(v);};
@@ -412,7 +488,14 @@ export function town(textured=true) {
       branch.rotation.z=-side*.48; root.add(branch);
     }
     const crown:Shape=[x,h*.78,z,h*.87,h*.82,h*.85,['#438e69','#5ca66d','#699e64','#7db475'][n%4],n%3===0?cone:ball];
-    if(moving){const leaf=mesh(crown);root.add(leaf);foliage.push(leaf);}
+    if(moving){
+      const leaf=mesh(crown);root.add(leaf);foliage.push(leaf);
+      for(let i=0;i<5;i++){
+        const a=i*2.4+n, size=.24+random(n+i*17)*.17;
+        permanent(x+Math.cos(a)*h*.20,h*(.67+random(n+i*19)*.23),z+Math.sin(a)*h*.19,h*size,h*.31,h*size,
+          ['#64945d','#749d5f','#879c63','#56815a','#a0a977'][i],ball);
+      }
+    }
     else permanent(...crown);
     permanent(x+.48,h*.63,z+.35,h*.67,h*.54,h*.64,'#77965e',lowBall);
     if(moving){
@@ -473,7 +556,9 @@ export function town(textured=true) {
       vec3 color=mix(vec3(.026,.23,.218),vec3(.14,.47,.405),smoothstep(-1.5,1.4,a+b));
       color=mix(color,vec3(.42,.58,.58),horizon*.6);
       float bank=surface.y<0.?smoothstep(6.6,7.9,abs(p.y)):0.;
-      float foam=smoothstep(.76,1.,ripples)*(.025+.17*bank);
+      float glint=pow(max(0.,dot(reflect(-view,normalize(vec3(a*.058,1.,b*.055))),normalize(vec3(-.49,.56,.64)))),28.);
+      float foam=smoothstep(.79,1.,ripples)*(.021+.16*bank);
+      color+=vec3(.38,.31,.19)*glint*(1.-night);
       color=mix(color+foam,vec3(.032,.078,.125)+foam*.2,night*.86);
       gl_FragColor=vec4(color,1.);
       #include <colorspace_fragment>
@@ -496,7 +581,7 @@ export function town(textured=true) {
 export function disposeWorld(scene:T.Scene) {
   const geometries=new Set<T.BufferGeometry>();
   const mats=new Set<T.Material>();
-  scene.traverse(o=>{ const m=o as T.Mesh; if(m.geometry)geometries.add(m.geometry); if(m.material) (Array.isArray(m.material)?m.material:[m.material]).forEach(v=>mats.add(v)); });
+  scene.traverse(o=>{ if(o instanceof T.SkinnedMesh)o.skeleton.dispose();const m=o as T.Mesh; if(m.geometry)geometries.add(m.geometry); if(m.material) (Array.isArray(m.material)?m.material:[m.material]).forEach(v=>mats.add(v)); });
   geometries.forEach(g=>{if(!sharedGeometries.has(g))g.dispose();});
   const maps=new Set<T.Texture>();
   mats.forEach(m=>{const map=(m as T.MeshBasicMaterial).map;if(map)maps.add(map);if(m!==vertexPaint&&m!==townPaint&&!Array.from(materials.values()).includes(m as T.MeshStandardMaterial))m.dispose();});

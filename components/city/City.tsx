@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import { Camera, Car, Compass, Flag, Gauge, Map, Settings, Star, Volume2, VolumeX } from 'lucide-react';
 import { bounds, columns, districts, pets, route, spawn, stamps, streets, type District, type DistrictId } from '@/lib/city';
+import { neighbors, type Neighbor } from '@/lib/neighbors';
 import { emptyInput, type InputKey } from '@/lib/city-motion';
 import type { Game, Preferences, Snapshot, Stats } from './engine';
 import { startAudio } from './audio';
@@ -10,10 +11,10 @@ import { Portfolio } from './Portfolio';
 
 const defaults:Preferences={quality:'medium',light:'cycle',audio:false,color:'#ff664d',seenIntro:false};
 const paint=['#ff664d','#5cb6ff','#a994ff','#8ce2a4','#ffc556','#eef3ff'];
-const initial:Snapshot={...spawn,speed:0,driving:true,near:null,pet:-1,night:false};
+const initial:Snapshot={...spawn,speed:0,driving:true,near:null,neighbor:-1,pet:-1,night:false};
 const directions:Record<string,InputKey>={KeyW:'up',ArrowUp:'up',KeyS:'down',ArrowDown:'down',KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right',Space:'brake'};
 const aliases:Record<string,string>={education:'university',certifications:'achievements',about:'home'};
-type Panel = 'map'|'settings'|'passport'|'photo'|'tutorial'|'destination'|'pet';
+type Panel = 'map'|'settings'|'passport'|'photo'|'tutorial'|'destination'|'pet'|'neighbor';
 const prefKey='developer-world-preferences-v1', progressKey='developer-world-passport-v1';
 function load(key:string):unknown { try{return JSON.parse(localStorage.getItem(key)??'null');}catch{return null;} }
 function save(key:string,value:unknown) {try{localStorage.setItem(key,JSON.stringify(value));}catch{/* storage may be disabled */}}
@@ -29,10 +30,10 @@ function CityMap({hud,goal,select}:{hud:Snapshot;goal?:District;select?:(d:Distr
   const height=bounds.bottom-bounds.top, width=bounds.right-bounds.left;
   const points=goal?route(hud,goal).map(p=>p.x+','+p.z).join(' '):'';
   return <svg viewBox={`${bounds.left} ${bounds.top} ${width} ${height}`} className="dw-minimap" role={select?'group':'img'} aria-label="City map">
-    <rect x={bounds.left} y={bounds.top} width={width} height={height} fill="#123641"/>
-    <rect x={bounds.left} y="-8" width={width} height="16" fill="#347a95"/>
-    {streets.map(z=><path key={z} d={`M${bounds.left} ${z}H${bounds.right}`} stroke="#54727a" strokeWidth="5"/>)}
-    {columns.map(x=><path key={x} d={`M${x} ${bounds.top}V${bounds.bottom}`} stroke="#54727a" strokeWidth="5"/>)}
+    <rect x={bounds.left} y={bounds.top} width={width} height={height} fill="#193633"/>
+    <rect x={bounds.left} y="-8" width={width} height="16" fill="#357d83"/>
+    {streets.map(z=><path key={z} d={`M${bounds.left} ${z}H${bounds.right}`} stroke="#74867a" strokeWidth="5"/>)}
+    {columns.map(x=><path key={x} d={`M${x} ${bounds.top}V${bounds.bottom}`} stroke="#74867a" strokeWidth="5"/>)}
     {points&&<polyline points={points} fill="none" stroke="#ffcf62" strokeWidth="1.9" strokeLinejoin="round"/>}
     {districts.map(d=><g key={d.id} role={select?'button':undefined} tabIndex={select?0:undefined} aria-label={d.name}
       onClick={select?()=>select(d):undefined} onKeyDown={select?e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(d);}}:undefined}>
@@ -51,6 +52,8 @@ export function City(){
   const [selected,setSelected]=useState<District>(districts[0]), [goal,setGoal]=useState<District>();
   const [status,setStatus]=useState<'idle'|'loading'|'ready'|'error'>('idle'), [attempt,setAttempt]=useState(0);
   const [note,setNote]=useState(''), [pet,setPet]=useState(0), [angle,setAngle]=useState(1.3);
+  const [neighbor,setNeighbor]=useState<Neighbor>();
+  const [photoZoom,setPhotoZoom]=useState(1);
   const [stick,setStick]=useState({x:0,z:0});
   const noteTimer=useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [hasIntro,setHasIntro]=useState(false);
@@ -114,7 +117,8 @@ export function City(){
         lost(){setStatus('error'); setHasIntro(false); audio.current?.update(0,false,false,false); clearTimeout(introTimer);},
         update(s){setHUD(s); audio.current?.update(s.speed,preferences.current.audio,s.driving,Math.abs(s.z)<15);},
         stats:setStats,open:openDistrict,visit,
-        pet(index){setPet(index); open('pet');},note:inform,
+        pet(index){setPet(index); open('pet');},
+        neighbor(person){setNeighbor(person);open('neighbor');},note:inform,
       });
       game.current=instance;
       if(shell.current && 'IntersectionObserver' in window){
@@ -135,9 +139,9 @@ export function City(){
     if(panel&&!el?.open){previousFocus.current=document.activeElement as HTMLElement;el?.showModal();}
     if(!panel&&el?.open){el.close();previousFocus.current?.focus();}
     game.current?.pause(!visible.current||(Boolean(panel)&&panel!=='photo'));
-    game.current?.photo(panel==='photo'?angle:null);
+    game.current?.photo(panel==='photo'?angle:null,photoZoom);
     if(panel&&panel!=='photo')audio.current?.update(0,false,false,false);
-  },[panel,angle]);
+  },[panel,angle,photoZoom]);
   useEffect(()=>{
     const handle=(e:KeyboardEvent)=>{
       if(e.type==='keyup'){if(directions[e.code])input.current[directions[e.code]]=false;return;}
@@ -169,13 +173,13 @@ export function City(){
   }
   function releaseStick(){setStick({x:0,z:0});Object.assign(input.current,{up:false,down:false,left:false,right:false});}
   const near=districts.find(d=>d.id===hud.near);
-  const title=panel==='destination'?selected.name:panel==='pet'?pets[pet].name:
+  const title=panel==='destination'?selected.name:panel==='pet'?pets[pet].name:panel==='neighbor'?neighbor?.name:
     panel==='map'?'City map':panel==='settings'?'Settings':panel==='passport'?'Developer Passport':panel==='photo'?'Photo mode':'Driving tutorial';
   return <section id="world" ref={shell} tabIndex={0} className="dw-world" aria-label="Developer World driving game">
     <div ref={host} className="dw-canvas" onPointerDown={()=>shell.current?.focus({preventScroll:true})}/>
     <div className="dw-shade"/>
     <div className="dw-world-head">
-      <div className="dw-world-title"><p className="dw-kicker"><Compass size={15}/> Pranesh Ramesh</p><h1>Developer World<span>.</span></h1><p className="dw-subtitle">Drive through Pranesh Ramesh’s software portfolio.</p></div>
+      <div className="dw-world-title" data-in-motion={status==='ready'&&(hud.speed>5||Boolean(near))}><p className="dw-kicker"><Compass size={15}/> Pranesh Ramesh</p><h1>Developer World<span>.</span></h1><p className="dw-subtitle">Drive, explore the town, or browse the portfolio in Recruiter Mode.</p></div>
       <div className="dw-toolbar" aria-label="Game tools">
         <button type="button" onClick={()=>open('map')} title="City map"><Map size={18}/><span>Map</span></button>
         <button type="button" onClick={()=>open('passport')} title="Passport"><Star size={18}/><span>Passport</span></button>
@@ -196,8 +200,8 @@ export function City(){
       </div>
       <div className="dw-game-actions">
         <button onClick={()=>{game.current?.vehicle();shell.current?.focus();}}><Car size={17}/>{hud.driving?'Exit car':'Enter car'}</button>
-        <button onClick={()=>{game.current?.interact();shell.current?.focus();}}><Flag size={17}/>{hud.pet>=0?'Pet':near?'Talk':'Interact'}</button>
-        <button title="Photo mode" aria-label="Photo mode" onClick={()=>{setAngle(hud.angle+.8);open('photo');}}><Camera size={17}/></button>
+        <button title={hud.neighbor>=0?'Talk to '+neighbors[hud.neighbor].name:undefined} onClick={()=>{game.current?.interact();shell.current?.focus();}}><Flag size={17}/>{hud.pet>=0?'Pet':near||hud.neighbor>=0?'Talk':'Interact'}</button>
+        <button title="Photo mode" aria-label="Photo mode" onClick={()=>{setAngle(hud.angle+.8);setPhotoZoom(1);open('photo');}}><Camera size={17}/></button>
       </div>
       {goal&&<div className="dw-gps"><Flag size={15}/>{goal.name}<button aria-label="Clear GPS" onClick={()=>{setGoal(undefined);game.current?.gps();}}>×</button></div>}
       <div className="dw-control-hint"><kbd>WASD</kbd> Drive <kbd>Space</kbd> Brake <kbd>F</kbd> Exit <kbd>E</kbd> Talk</div>
@@ -223,6 +227,9 @@ export function City(){
         </>}
         {panel==='destination'&&<><blockquote><strong>{selected.host}</strong><p>“{selected.line}”</p></blockquote><Portfolio id={selected.id}/><div className="dw-actions"><a href={'#'+selected.id} onClick={()=>setPanel(null)}>Open shareable section</a>{selected.id==='garage'&&<button onClick={()=>open('settings')}>Customize car</button>}</div></>}
         {panel==='pet'&&<p>{pets[pet].line}</p>}
+        {panel==='neighbor'&&neighbor&&<blockquote className="dw-neighbor-dialogue" style={{borderLeftColor:neighbor.color}}>
+          <strong>{neighbor.role}</strong><p>{neighbor.line}</p>
+        </blockquote>}
         {panel==='tutorial'&&<><Portfolio id="garage"/><div className="dw-actions"><button className="dw-button dw-primary" onClick={()=>setPanel(null)}>Start driving</button><a href="#recruiter" onClick={()=>setPanel(null)}>Recruiter Mode</a></div></>}
         {panel==='passport'&&<>
           <label className="dw-passport">{visited.length} of {districts.length} destinations visited<progress max={districts.length} value={visited.length}/></label>
@@ -239,7 +246,8 @@ export function City(){
           {stats&&<p className="dw-stats" data-testid="world-performance">{stats.fps} FPS · worst frame {stats.frame} ms · {stats.draws} draws · {stats.triangles} triangles · {stats.scale}× render scale</p>}
         </>}
         {panel==='photo'&&<>
-          <label className="dw-search">Camera angle<input type="range" min="-3.15" max="9.43" step=".04" value={angle} onChange={e=>setAngle(Number(e.target.value))}/></label>
+          <label className="dw-search">Camera angle<input aria-label="Camera angle" type="range" min="-3.15" max="9.43" step=".04" value={angle} onChange={e=>setAngle(Number(e.target.value))}/></label>
+          <label className="dw-search">Camera zoom<input aria-label="Camera zoom" type="range" min="1" max="2.75" step=".05" value={photoZoom} onChange={e=>setPhotoZoom(Number(e.target.value))}/></label>
           <button className="dw-button dw-primary" onClick={()=>{const url=game.current?.capture();if(url){const a=document.createElement('a');a.href=url;a.download='developer-world.png';a.click();}}}>Download photo</button>
         </>}
       </div>

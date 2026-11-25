@@ -1,5 +1,5 @@
 export const districts = [
-  { id: 'home', name: 'Home', topic: 'Profile & résumé', color: '#ff765e', x: -30, z: 30, host: 'City Guide', line: 'Welcome! The car is yours. The parking tickets are fictional.' },
+  { id: 'home', name: 'Home', topic: 'Profile & resume', color: '#ff765e', x: -30, z: 30, host: 'City Guide', line: 'Welcome! The car is yours. The parking tickets are fictional.' },
   { id: 'garage', name: 'Garage', topic: 'Driving & paint shop', color: '#ffc65a', x: 0, z: 30, host: 'Mechanic', line: 'Have you tried turning it off and on again?' },
   { id: 'projects', name: 'Project Lab', topic: 'Selected work', color: '#6a8eff', x: 30, z: 30, host: 'Software Developer', line: 'My code has no bugs. It just has unexpected features.' },
   { id: 'skills', name: 'Skill Workshop', topic: 'Technical toolkit', color: '#b296ff', x: -30, z: -30, host: 'Security Mentor', line: 'The strongest password is the one you didn’t name password.' },
