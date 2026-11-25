@@ -50,3 +50,6 @@ github_repos.json
 /test-results/
 /playwright-report/
 /.next-production/
+
+/artifacts/visual-qa/
+/.next-art/

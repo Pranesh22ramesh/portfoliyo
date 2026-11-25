@@ -24,7 +24,7 @@ export const parkedCars = [
   {x:-37,z:-44,color:'#52a992'}, {x:9,z:-42,color:'#d6ddbb'},
 ];
 export const shop={x:30,z:-61};
-export const secret={x:36,z:-67,name:'The Debugger?s Bench',line:'Build passed on the first try. This bench commemorates the occasion.'};
+export const secret={x:36,z:-67,name:'The Debugger’s Bench',line:'Build passed on the first try. This bench commemorates the occasion.'};
 export const pets = [
   { x: 55, z: -32, name: 'Byte the dog', line: 'Byte fetched a byte. It was a very short stick.' },
   { x: 68, z: -26, name: 'Cache the cat', line: 'Cache ignores you until you clear your cache.' },

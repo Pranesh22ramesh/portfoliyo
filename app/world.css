@@ -110,3 +110,44 @@
 .dw-credential-exit{display:none!important}.dw-credential:fullscreen{background:#091820;width:100%;height:100%;margin:0}.dw-credential:fullscreen img{object-position:center}.dw-credential:fullscreen .dw-credential-exit{display:inline-flex!important;position:absolute;top:12px;right:12px;z-index:1}
 
 .dw-project-image{max-width:650px;margin:18px 0;color:var(--muted)}.dw-project-image img{width:100%;height:auto;border:1px solid var(--line);border-radius:14px}.dw-project-image figcaption{margin-top:6px;font-size:.9rem}
+
+/* River town interface */
+.dw{--ink:#f7edd8;--muted:#bdc9bf;--panel:#1b3332;--line:#455a50;--accent:#f0c984;background:#142625}
+.dw-header{background:#142725}
+.dw-brand span{background:#e7bf79;color:#163431;border:1px solid #f6d596;border-radius:7px}
+.dw-world-head{top:clamp(18px,3.2vw,46px)}
+.dw-world-title{max-width:min(57vw,620px)}
+.dw-world h1{font:700 clamp(2.55rem,6.4vw,6.3rem)/.91 Georgia,serif;letter-spacing:-.068em;text-wrap:balance;text-shadow:0 3px 23px #102c2ac0}
+.dw-world-title .dw-kicker{color:#ffdf9d;font-size:.75rem;letter-spacing:.13em;margin-bottom:9px}
+.dw-subtitle{font-size:clamp(.89rem,1.3vw,1.09rem);margin-top:10px;max-width:33ch;color:#fff3d9}
+.dw-shade{background:radial-gradient(ellipse 69% 58% at 0 0,#102b2bd7 0%,#112a2c91 37%,transparent 100%),linear-gradient(0deg,#102321e8,transparent 27%)}
+.dw-toolbar button,.dw-game-actions button,.dw-touch button,.dw-dialog button,.dw-button{background:#193330f2;border-color:#67847780;color:var(--ink);border-radius:9px}
+.dw-toolbar button,.dw-game-actions button{box-shadow:0 3px 10px #15272450}
+.dw-button.dw-primary{background:#eac17d;border-color:#eac17d;color:#172c28}
+.dw-map-button{background:#183431;border-color:#9eac8f;border-radius:13px;padding:5px}
+.dw-speed{position:relative;overflow:hidden;background:#193330;border-color:#698177;border-radius:9px;padding-inline:9px}
+.dw-speed i{position:absolute;bottom:0;left:0;height:2px;background:#f0c984}
+.dw-speed svg{color:#e5c386}
+.dw-location{position:absolute;z-index:1;right:clamp(16px,4vw,64px);top:calc(clamp(18px,3.2vw,46px) + 54px);margin:0;display:flex;align-items:center;gap:7px;color:#ece8d6;background:#193330ef;border:1px solid #8c9c7797;border-radius:99px;padding:4px 10px;font-size:.78rem}
+.dw-location span{width:6px;height:6px;background:#ebce8b;border-radius:50%}
+.dw-gps,.dw-toast,.dw-loader{background:#193330f6;border:1px solid #90a88d}
+.dw-recruiter-top h2,.dw-detail h1{font-family:Georgia,serif;font-weight:700}
+.dw-recruiter-top{padding-bottom:17px;border-bottom:1px solid #4a5e52}
+.dw-index a,.dw-tags li{background:#223c37;border-color:#546b58}
+.dw-entries article,.dw-dialog blockquote,.dw-stamps li{background:#142c2a}
+.dw-dialog{background:#203936;border-color:#82947d}
+.dw-dialog-head{padding-bottom:12px;border-bottom:1px solid #576a56}
+.dw-dialog-head h2{font-family:Georgia,serif;font-weight:700}
+.dw-dialog blockquote strong{color:#f0ca88}
+.dw-settings select,.dw-search input{background:#122b28;border-color:#688171}
+.dw-stick{background:#213f39c7!important;border-color:#d5c598!important}
+.dw-stick span{background:#ecca8c!important;box-shadow:0 3px 11px #1425238e}
+@media(max-width:760px){
+ .dw-world h1{font-size:clamp(2.4rem,10.5vw,4.4rem)}
+ .dw-world-title{max-width:60vw}
+ .dw-world-title .dw-kicker{font-size:.66rem}
+ .dw-location{top:65px}
+}
+@media(pointer:coarse){
+ .dw-speed{position:absolute}
+}

@@ -20,7 +20,7 @@ export const projects:Project[] = [
     solution:'Bring quantity calculations, collections and daily reporting into a mobile workflow.',
     architecture:'An Expo and React Native client with TypeScript.',
     result:'Public source is available for review.' },
-  { id:'api_downtime_anlyzes', title:'API Downtime Analyzer', stack:'Python ? time series ML ? REST',
+  { id:'api_downtime_anlyzes', title:'API Downtime Analyzer', stack:'Python · time series ML · REST',
     problem:'Service operators need to identify abnormal API behavior early enough to investigate.',
     solution:'Collect API measurements and surface anomaly scores, monitoring history and risk indicators.',
     architecture:'Python monitoring services, trained model assets and a browser dashboard.',
@@ -40,7 +40,7 @@ export const credentials:Credential[] = [
   {id:'intro-cybersecurity',title:'Introduction to Cybersecurity',issuer:'Cisco Networking Academy',date:'November 2024',asset:'/certificates/cisco-intro.webp',verify:'https://www.credly.com/go/8CphoeKo'},
   {id:'oracle-apex',title:'Oracle APEX Cloud Developer Certified Professional',issuer:'Oracle',date:'May 2025',asset:'/certificates/oracle-apex.webp'},
   {id:'oracle-java',title:'Java Certified Foundations Associate',issuer:'Oracle',date:'May 2026',asset:'/certificates/oracle-java.webp'},
-  {id:'nptel-ai-hr',title:'AI in Human Resource Management',issuer:'NPTEL ? IIT Guwahati',date:'January?April 2026',asset:'/certificates/nptel-ai-hr.webp',verify:'https://nptel.ac.in/noc/E_Certificate/NOC26MG19S115810040004763256'},
+  {id:'nptel-ai-hr',title:'AI in Human Resource Management',issuer:'NPTEL · IIT Guwahati',date:'January–April 2026',asset:'/certificates/nptel-ai-hr.webp',verify:'https://nptel.ac.in/noc/E_Certificate/NOC26MG19S115810040004763256'},
   {id:'infosys-javascript',title:'JavaScript',issuer:'Infosys Springboard',date:'April 2024',asset:'/certificates/infosys-javascript.webp'},
 ];
 

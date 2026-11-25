@@ -175,7 +175,7 @@ export function City(){
     <div ref={host} className="dw-canvas" onPointerDown={()=>shell.current?.focus({preventScroll:true})}/>
     <div className="dw-shade"/>
     <div className="dw-world-head">
-      <div><p className="dw-kicker"><Compass size={15}/> An interactive portfolio</p><h1>Developer<br/>World<span>.</span></h1><p className="dw-subtitle">Drive through Pranesh Ramesh’s software portfolio.</p></div>
+      <div className="dw-world-title"><p className="dw-kicker"><Compass size={15}/> Pranesh Ramesh</p><h1>Developer World<span>.</span></h1><p className="dw-subtitle">Drive through Pranesh Ramesh’s software portfolio.</p></div>
       <div className="dw-toolbar" aria-label="Game tools">
         <button type="button" onClick={()=>open('map')} title="City map"><Map size={18}/><span>Map</span></button>
         <button type="button" onClick={()=>open('passport')} title="Passport"><Star size={18}/><span>Passport</span></button>
@@ -189,9 +189,10 @@ export function City(){
       </>}
     </div>}
     {status==='ready'&&<>
+      <p className="dw-location"><span aria-hidden="true"/>{near?.name??(hud.z>7?'Southbank':hud.z< -7?'Northbank':'River crossing')}</p>
       <div className="dw-hud">
         <button className="dw-map-button" onClick={()=>open('map')} aria-label="Open city map"><CityMap hud={hud} goal={goal}/></button>
-        <div className="dw-speed" aria-label={Math.round(hud.speed)+' kilometres per hour'}><Gauge size={19}/><strong>{Math.round(hud.speed)}</strong><span>km/h</span></div>
+        <div className="dw-speed" aria-label={Math.round(hud.speed)+' kilometres per hour'}><Gauge size={19}/><strong>{Math.round(hud.speed)}</strong><span>km/h</span><i style={{width:Math.min(100,hud.speed/86*100)+'%'}} aria-hidden="true"/></div>
       </div>
       <div className="dw-game-actions">
         <button onClick={()=>{game.current?.vehicle();shell.current?.focus();}}><Car size={17}/>{hud.driving?'Exit car':'Enter car'}</button>
