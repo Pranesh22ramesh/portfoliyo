@@ -1,12 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
-import { BookOpen, Camera, Car, Compass, FileText, Flag, Gauge, Map, Settings, Star, Volume2, VolumeX } from 'lucide-react';
+import { BookOpen, Camera, Car, Compass, FileText, Flag, Gauge, Map, Settings, Smartphone, Star, Volume2, VolumeX } from 'lucide-react';
 import { bounds, columns, distance, districts, parking, pets, spawn, stamps, streets, type District, type DistrictId } from '@/lib/city';
 import { roadRoute as route } from '@/lib/city-route';
 import { neighbors, type Neighbor } from '@/lib/neighbors';
 import { emptyInput, type InputKey } from '@/lib/city-motion';
 import type { Game, Preferences, Snapshot, Stats } from './engine';
+import { roomLabels as roomTitle, type RoomId } from '@/lib/rooms';
+import { canCompleteMission, missions, type Mission, type MissionId } from '@/lib/missions';
 import { startAudio } from './audio';
 import { credentials, projects } from '@/lib/portfolio';
 import { ProjectDetail, CredentialDetail } from './PortfolioDetail';
@@ -15,12 +17,12 @@ import { Directory } from './Directory';
 
 const defaults:Preferences={quality:'medium',light:'cycle',audio:false,color:'#ff664d',seenIntro:false};
 const paint=['#ff664d','#5cb6ff','#a994ff','#8ce2a4','#ffc556','#eef3ff'];
-const initial:Snapshot={...spawn,speed:0,driving:true,near:null,neighbor:-1,pet:-1,night:false};
-const directions:Record<string,InputKey>={KeyW:'up',ArrowUp:'up',KeyS:'down',ArrowDown:'down',KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right',Space:'brake'};
+const initial:Snapshot={...spawn,speed:0,driving:true,near:null,neighbor:-1,pet:-1,night:false,height:0,room:null,pace:'idle'};
+const directions:Record<string,InputKey>={KeyW:'up',ArrowUp:'up',KeyS:'down',ArrowDown:'down',KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right',Space:'brake',ShiftLeft:'sprint',ShiftRight:'sprint',KeyX:'walk'};
 const aliases:Record<string,string>={education:'university',certifications:'achievements',about:'home'};
 type Detail = {kind:'project'|'credential';id:string;origin:DistrictId};
-type Panel = 'detail'|'directory'|'resume'|'map'|'settings'|'passport'|'photo'|'tutorial'|'destination'|'pet'|'neighbor';
-const prefKey='developer-world-preferences-v1', progressKey='developer-world-passport-v1';
+type Panel = 'phone'|'detail'|'directory'|'resume'|'map'|'settings'|'passport'|'photo'|'tutorial'|'destination'|'pet'|'neighbor';
+const prefKey='developer-world-preferences-v1', progressKey='developer-world-passport-v1', missionKey='developer-world-missions-v1';
 function load(key:string):unknown { try{return JSON.parse(localStorage.getItem(key)??'null');}catch{return null;} }
 function save(key:string,value:unknown) {try{localStorage.setItem(key,JSON.stringify(value));}catch{/* storage may be disabled */}}
 function savedPrefs():Preferences{
@@ -61,6 +63,11 @@ export function City(){
   const [hud,setHUD]=useState(initial), [stats,setStats]=useState<Stats>(), [prefs,setPrefs]=useState(defaults);
   const preferences=useRef(defaults), seen=useRef(new Set<DistrictId>());
   const [visited,setVisited]=useState<DistrictId[]>([]), [panel,setPanel]=useState<Panel|null>(null);
+  const [mission,setMission]=useState<Mission>();
+  const [finished,setFinished]=useState<MissionId[]>([]);
+  const missionRef=useRef<Mission|undefined>(undefined);
+  const finishedRef=useRef<MissionId[]>([]);
+  const orbit=useRef<{id:number;x:number}|null>(null);
   const [detail,setDetail]=useState<Detail>();
   const [selected,setSelected]=useState<District>(districts[0]), [goal,setGoal]=useState<District>();
   const [status,setStatus]=useState<'idle'|'loading'|'ready'|'error'>('idle'), [attempt,setAttempt]=useState(0);
@@ -103,6 +110,8 @@ export function City(){
   },[]);
   useEffect(()=>{
     const p=savedPrefs();preferences.current=p;setPrefs(p);
+    const history=load(missionKey);
+    if(Array.isArray(history)){finishedRef.current=missions.filter(m=>history.includes(m.id)).map(m=>m.id);setFinished(finishedRef.current);}
     const values=load(progressKey);
     if(Array.isArray(values)){seen.current=new Set(districts.filter(d=>values.includes(d.id)).map(d=>d.id));setVisited(Array.from(seen.current));}
     const followLink=()=>{
@@ -151,7 +160,18 @@ export function City(){
           }
         },
         lost(){setStatus('error'); setHasIntro(false); audio.current?.update(0,false,false,false); clearTimeout(introTimer);},
-        update(s){setHUD(s); audio.current?.update(s.speed,preferences.current.audio,s.driving,Math.abs(s.z)<15);},
+        update(s){
+          setHUD(s);audio.current?.update(s.speed,preferences.current.audio,s.driving,!s.room&&Math.abs(s.z)<15);
+          const active=missionRef.current;
+          if(active&&canCompleteMission(active,s.near,Boolean(s.room))){
+            missionRef.current=undefined;setMission(undefined);
+            if(!finishedRef.current.includes(active.id)){
+              finishedRef.current=[...finishedRef.current,active.id];
+              setFinished(finishedRef.current);save(missionKey,finishedRef.current);
+            }
+            inform('Mission complete: '+active.title);
+          }
+        },
         stats:setStats,open:openDistrict,visit,
         pet(index){setPet(index); open('pet');},
         neighbor(person){setNeighbor(person);open('neighbor');},note:inform,
@@ -191,10 +211,11 @@ export function City(){
       const direction=directions[e.code];
       if(direction){ e.preventDefault(); input.current[direction]=true; }
       if(e.repeat)return;
+      if(e.code==='Space')game.current.jump();
       if(e.code==='KeyE')game.current.interact();
       if(e.code==='KeyF')game.current.vehicle();
       if(e.code==='KeyM')open('map');
-      if(e.code==='KeyP')open('directory');
+      if(e.code==='KeyP')open('phone');
       if(e.code==='Escape')open('settings');
       if(e.code==='KeyR'){game.current.travel();inform('Returned to the city entrance.');}
     };
@@ -203,6 +224,18 @@ export function City(){
   },[panel,open,inform]);
   function skip(){game.current?.skip();setHasIntro(false);patch({seenIntro:true});}
   function teleport(){game.current?.travel(selected);closePanel();shell.current?.focus({preventScroll:true});}
+  function acceptMission(pick:Mission){
+    const target=districts.find(d=>d.id===pick.district);
+    if(!target)return;
+    missionRef.current=pick;setMission(pick);
+    setGoal(target);game.current?.gps(target);closePanel();
+    inform(pick.title+': GPS set to '+target.name+'.');
+  }
+  function clearGPS(){
+    if(missionRef.current?.district===goal?.id){missionRef.current=undefined;setMission(undefined);}
+    setGoal(undefined);game.current?.gps();
+  }
+  function enterRoom(id:RoomId){game.current?.enterRoom(id);closePanel();shell.current?.focus({preventScroll:true});}
   function chooseGPS(){setGoal(selected);game.current?.gps(selected);closePanel();shell.current?.focus({preventScroll:true});inform('GPS route set to '+selected.name+'.');}
   function joystick(e:PointerEvent<HTMLDivElement>){
     const rect=e.currentTarget.getBoundingClientRect(),dx=e.clientX-rect.left-rect.width/2,dz=e.clientY-rect.top-rect.height/2;
@@ -212,22 +245,37 @@ export function City(){
   }
   function releaseStick(){setStick({x:0,z:0});Object.assign(input.current,{up:false,down:false,left:false,right:false});}
   const near=districts.find(d=>d.id===hud.near);
-  const remaining=goal?distance(hud,parking(goal)):0;
+  const outside=districts.find(d=>d.id===hud.room);
+  const mapPose=outside?{...hud,...parking(outside)}:hud;
+  const remaining=goal?distance(mapPose,parking(goal)):0;
   const arrived=Boolean(goal&&remaining<=5);
   const project=detail?.kind==='project'?projects.find(p=>p.id===detail.id):undefined;
   const credential=detail?.kind==='credential'?credentials.find(c=>c.id===detail.id):undefined;
-  const title=panel==='detail'?(project?.title??credential?.title??'Details'):panel==='directory'?'Destination directory':panel==='resume'?'Resume':panel==='destination'?selected.name:panel==='pet'?pets[pet].name:panel==='neighbor'?neighbor?.name:
+  const title=panel==='phone'?'Field phone':panel==='detail'?(project?.title??credential?.title??'Details'):panel==='directory'?'Destination directory':panel==='resume'?'Resume':panel==='destination'?selected.name:panel==='pet'?pets[pet].name:panel==='neighbor'?neighbor?.name:
     panel==='map'?'City map':panel==='settings'?'Settings':panel==='passport'?'Developer Passport':panel==='photo'?'Photo mode':'Driving tutorial';
-  return <section id="world" ref={shell} tabIndex={0} className="dw-world" aria-label="Developer World driving game">
-    <div ref={host} className="dw-canvas" onPointerDown={()=>shell.current?.focus({preventScroll:true})}/>
+  return <section id="world" ref={shell} tabIndex={0} className="dw-world" data-pace={hud.pace} data-room={hud.room??undefined} aria-label="Developer World driving game">
+    <div ref={host} className="dw-canvas" onContextMenu={e=>e.preventDefault()}
+      onPointerDown={e=>{
+        shell.current?.focus({preventScroll:true});
+        if(e.button===2||e.pointerType==='touch'){
+          e.currentTarget.setPointerCapture(e.pointerId);orbit.current={id:e.pointerId,x:e.clientX};
+        }
+      }}
+      onPointerMove={e=>{
+        if(orbit.current?.id!==e.pointerId)return;
+        game.current?.look((orbit.current.x-e.clientX)*.008);
+        orbit.current.x=e.clientX;
+      }}
+      onPointerUp={()=>{orbit.current=null;}} onPointerCancel={()=>{orbit.current=null;}} onLostPointerCapture={()=>{orbit.current=null;}}/>
     <div className="dw-shade"/>
     <div className="dw-world-head">
-      <div className="dw-world-title" data-in-motion={status==='ready'&&(hud.speed>5||Boolean(near))}><p className="dw-kicker"><Compass size={15}/> Pranesh Ramesh</p><h1>Developer World<span>.</span></h1><p className="dw-subtitle">Explore the town or open the destination directory.</p></div>
+      <div className="dw-world-title" data-in-motion={status==='ready'&&(hud.speed>5||Boolean(near)||Boolean(hud.room))}><p className="dw-kicker"><Compass size={15}/> Pranesh Ramesh</p><h1>Developer World<span>.</span></h1><p className="dw-subtitle">Explore the town or open the destination directory.</p></div>
       <div className="dw-toolbar" aria-label="Game tools">
+        <button type="button" onClick={()=>open('phone')} title="Field phone" aria-label="Field phone"><Smartphone size={18}/><span>Phone</span></button>
         <button type="button" onClick={()=>open('directory')} title="Destination directory" aria-label="Destination directory"><BookOpen size={18}/><span>Directory</span></button>
         <button type="button" onClick={()=>open('resume')} title="Resume" aria-label="Resume"><FileText size={18}/><span>Resume</span></button>
         <button type="button" onClick={()=>open('map')} title="City map"><Map size={18}/><span>Map</span></button>
-        <button type="button" onClick={()=>open('passport')} title="Passport"><Star size={18}/><span>Passport</span></button>
+        <button className="dw-toolbar-passport" type="button" onClick={()=>open('passport')} title="Passport"><Star size={18}/><span>Passport</span></button>
         <button type="button" onClick={()=>open('settings')} title="Settings"><Settings size={18}/><span>Settings</span></button>
       </div>
     </div>
@@ -238,25 +286,33 @@ export function City(){
       </>}
     </div>}
     {status==='ready'&&<>
-      <p className="dw-location"><span aria-hidden="true"/>{near?.name??(hud.z>7?'Southbank':hud.z< -7?'Northbank':'River crossing')}</p>
+      <p className="dw-location"><span aria-hidden="true"/>{hud.room?roomTitle[hud.room]:near?.name??(hud.z>7?'Southbank':hud.z< -7?'Northbank':'River crossing')}</p>
       <div className="dw-hud">
-        <button className="dw-map-button" onClick={()=>open('map')} aria-label="Open city map"><CityMap hud={hud} goal={goal}/></button>
+        {!hud.room&&<button className="dw-map-button" onClick={()=>open('map')} aria-label="Open city map"><CityMap hud={hud} goal={goal}/></button>}
         <div className="dw-speed" aria-label={Math.round(hud.speed)+' kilometres per hour'}><Gauge size={19}/><strong>{Math.round(hud.speed)}</strong><span>km/h</span><i style={{width:Math.min(100,hud.speed/86*100)+'%'}} aria-hidden="true"/></div>
       </div>
       <div className="dw-game-actions">
-        <button onClick={()=>{game.current?.vehicle();shell.current?.focus();}}><Car size={17}/>{hud.driving?'Exit car':'Enter car'}</button>
-        <button title={hud.neighbor>=0?'Talk to '+neighbors[hud.neighbor].name:undefined} onClick={()=>{game.current?.interact();shell.current?.focus();}}><Flag size={17}/>{hud.pet>=0?'Pet':near||hud.neighbor>=0?'Talk':'Interact'}</button>
+        {hud.room?<button onClick={()=>game.current?.exitRoom()}>Exit building</button>:<button onClick={()=>{game.current?.vehicle();shell.current?.focus();}}><Car size={17}/>{hud.driving?'Exit car':'Enter car'}</button>}
+        {!hud.room&&<button title={hud.neighbor>=0?'Talk to '+neighbors[hud.neighbor].name:undefined} onClick={()=>{game.current?.interact();shell.current?.focus();}}><Flag size={17}/>{hud.pet>=0?'Pet':near||hud.neighbor>=0?'Talk':'Interact'}</button>}
         <button title="Photo mode" aria-label="Photo mode" onClick={()=>{setAngle(hud.angle+.8);setPhotoZoom(1);open('photo');}}><Camera size={17}/></button>
       </div>
-      {goal&&<div className="dw-gps"><Flag size={15}/>{arrived?'Arrived: ':''}{goal.name}{!arrived&&<small>{Math.ceil(remaining)} m</small>}<button aria-label="Clear GPS" onClick={()=>{setGoal(undefined);game.current?.gps();}}>×</button></div>}
-      <div className="dw-control-hint"><kbd>WASD</kbd> Drive <kbd>Space</kbd> Brake <kbd>F</kbd> Exit <kbd>E</kbd> Talk</div>
+      {goal&&!hud.room&&<div className="dw-gps"><Flag size={15}/>{arrived?'Arrived: ':''}{goal.name}{!arrived&&<small>{Math.ceil(remaining)} m</small>}<button aria-label="Clear GPS" onClick={clearGPS}>×</button></div>}
+      {mission&&<p className="dw-mission-chip"><Flag size={14}/> {mission.title}</p>}
+      <div className="dw-control-hint">
+        <kbd>WASD</kbd> {hud.driving?'Drive':'Move'} <kbd>Space</kbd> {hud.driving?'Brake':'Jump'}
+        {hud.driving?<><kbd>F</kbd> Exit</>:<><kbd>Shift</kbd> Sprint <kbd>X</kbd> Walk</>} <kbd>P</kbd> Phone
+      </div>
       <div className="dw-touch">
         <div className="dw-stick" aria-label="Touch joystick" onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);joystick(e);}}
           onPointerMove={e=>{if(e.currentTarget.hasPointerCapture(e.pointerId))joystick(e);}} onPointerUp={releaseStick} onPointerCancel={releaseStick} onLostPointerCapture={releaseStick}>
           <span style={{transform:`translate(${stick.x}px,${stick.z}px)`}}/>
         </div>
-        <button onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);input.current.brake=true;}}
-          onPointerUp={()=>{input.current.brake=false;}} onPointerCancel={()=>{input.current.brake=false;}} onLostPointerCapture={()=>{input.current.brake=false;}}>Brake</button>
+        {!hud.driving?<div className="dw-walk-touch">
+          <button onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);input.current.sprint=true;}}
+            onLostPointerCapture={()=>{input.current.sprint=false;}}>Sprint</button>
+          <button onClick={()=>game.current?.jump()}>Jump</button>
+        </div>:<button onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);input.current.brake=true;}}
+          onPointerUp={()=>{input.current.brake=false;}} onPointerCancel={()=>{input.current.brake=false;}} onLostPointerCapture={()=>{input.current.brake=false;}}>Brake</button>}
       </div>
     </>}
     {hasIntro&&<button className="dw-skip dw-button" onClick={skip}>Skip intro</button>}
@@ -264,6 +320,19 @@ export function City(){
     <dialog ref={dialog} aria-labelledby="dw-dialog-title" className={panel==='photo'?'dw-dialog dw-photo':'dw-dialog'} onCancel={e=>{e.preventDefault();closePanel();}} onClick={e=>{if(e.target===e.currentTarget)closePanel();}}>
       <div className="dw-dialog-inner">
         <div className="dw-dialog-head"><h2 id="dw-dialog-title">{title}</h2><button aria-label="Close panel" onClick={closePanel}>×</button></div>
+        {panel==='phone'&&<>
+          <div className="dw-phone-apps">
+            <button onClick={()=>open('directory')}>Directory</button><button onClick={()=>open('map')}>Map</button>
+            <button onClick={()=>open('resume')}>Resume</button><button onClick={()=>open('passport')}>Passport</button>
+          </div>
+          <h3>Optional missions</h3>
+          <ul className="dw-missions">{missions.map(item=><li key={item.id}>
+            <div><strong>{item.title}</strong><p>{item.brief}</p></div>
+            <button type="button" disabled={status!=='ready'||mission?.id===item.id||finished.includes(item.id)} onClick={()=>acceptMission(item)}>
+              {finished.includes(item.id)?'Completed':mission?.id===item.id?'Active':'Set mission GPS'}
+            </button>
+          </li>)}</ul>
+        </>}
         {panel==='detail'&&<>
           {project&&<ProjectDetail project={project}/>}
           {credential&&<CredentialDetail credential={credential}/>}
@@ -275,12 +344,13 @@ export function City(){
           <iframe className="dw-resume-preview" title="Pranesh Ramesh Resume" src="/resume.pdf#view=FitH"/>
         </>}
         {panel==='map'&&<>
-          <div className="dw-map-layout"><CityMap hud={hud} goal={goal} select={setSelected}/>
+          <div className="dw-map-layout"><CityMap hud={mapPose} goal={goal} select={setSelected}/>
             <div className="dw-district-list">{districts.map(d=><button key={d.id} aria-pressed={selected.id===d.id} style={{'--district':d.color} as CSSProperties} onClick={()=>setSelected(d)}>{d.name}</button>)}</div>
           </div>
           <div className="dw-actions"><button onClick={()=>openDistrict(selected)}>Open {selected.name}</button><button disabled={status!=='ready'} onClick={chooseGPS}>Set GPS</button><button disabled={status!=='ready'} className="dw-button dw-primary" onClick={teleport}>Fast travel</button></div>
         </>}
-        {panel==='destination'&&<><blockquote><strong>{selected.host}</strong><p>“{selected.line}”</p></blockquote><Portfolio id={selected.id} onDetail={openDetail}/><div className="dw-actions"><button onClick={()=>open('directory')}>All destinations</button><a href={'#'+selected.id} aria-label={'Direct link to '+selected.name}>Section link</a>{selected.id==='garage'&&<button onClick={()=>open('settings')}>Customize car</button>}</div></>}
+        {panel==='destination'&&<><blockquote><strong>{selected.host}</strong><p>“{selected.line}”</p></blockquote><Portfolio id={selected.id} onDetail={openDetail}/><div className="dw-actions"><button onClick={()=>open('directory')}>All destinations</button><a href={'#'+selected.id} aria-label={'Direct link to '+selected.name}>Section link</a>{selected.id==='garage'&&<button onClick={()=>open('settings')}>Customize car</button>}
+          {(selected.id==='garage'||selected.id==='research')&&<button disabled={status!=='ready'} onClick={()=>enterRoom(selected.id as RoomId)}>Enter building</button>}</div></>}
         {panel==='pet'&&<p>{pets[pet].line}</p>}
         {panel==='neighbor'&&neighbor&&<blockquote className="dw-neighbor-dialogue" style={{borderLeftColor:neighbor.color}}>
           <strong>{neighbor.role}</strong><p>{neighbor.line}</p>

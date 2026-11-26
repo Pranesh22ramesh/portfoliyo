@@ -18,8 +18,24 @@ for(const mobile of [false,true]){
   page.on('response',r=>{if(r.status()>=400)errors.push(r.status()+' '+r.url());});
   await page.goto(url);
   await page.getByRole('button',{name:'Exit car'}).waitFor({timeout:25000});
+  const release=await page.locator('main').getAttribute('data-release');
+  if(process.env.WORLD_EXPECT_RELEASE&&release!==process.env.WORLD_EXPECT_RELEASE)throw new Error(`Expected ${process.env.WORLD_EXPECT_RELEASE}, received ${release}`);
+  await page.locator('canvas[data-roadster="gltf"]').waitFor({timeout:15000});
+  await page.evaluate(()=>window.scrollTo(500,500));
+  const overflow=await page.evaluate(()=>scrollX||scrollY||document.documentElement.scrollHeight!==innerHeight||document.documentElement.scrollWidth!==innerWidth);
+  if(overflow)throw new Error('The game page scrolls.');
   await page.waitForTimeout(650);
   await page.screenshot({path:dir+'/'+prefix+(mobile?'-mobile':'-street')+'.png'});
+  const phone=page.getByRole('button',{name:'Field phone',exact:true});
+  if(await phone.count()){
+    await phone.click();
+    const dialog=page.getByRole('dialog');
+    await dialog.getByRole('heading',{name:'Field phone'}).waitFor();
+    const mission=dialog.getByRole('listitem').filter({hasText:'First build'});
+    await mission.getByRole('button',{name:'Set mission GPS'}).waitFor();
+    await page.screenshot({path:dir+'/'+prefix+(mobile?'-mobile':'')+'-phone.png'});
+    await dialog.getByRole('button',{name:'Close panel'}).click();
+  }
   if(!mobile){
     const dialog=page.getByRole('dialog');
     for(const name of destinations){
@@ -45,7 +61,16 @@ for(const mobile of [false,true]){
       }
       await page.getByRole('button',{name:'Talk',exact:true}).click();
       await dialog.getByRole('heading',{name,exact:true}).waitFor();
-      await dialog.getByRole('button',{name:'Close panel'}).click();
+      const interior=dialog.getByRole('button',{name:'Enter building'});
+      if(await interior.count()){
+        await interior.click();
+        const exit=page.getByRole('button',{name:'Exit building'});
+        await exit.waitFor();
+        await page.waitForTimeout(500);
+        await page.screenshot({path:dir+'/'+prefix+'-'+name.toLowerCase().replaceAll(' ','-')+'-interior.png'});
+        await exit.click();
+        await page.getByRole('button',{name:'Exit car'}).waitFor();
+      }else await dialog.getByRole('button',{name:'Close panel'}).click();
     }
     await page.getByRole('button',{name:'Exit car'}).click();
     await page.getByRole('button',{name:'Enter car'}).waitFor();
@@ -66,7 +91,7 @@ for(const mobile of [false,true]){
     await page.getByRole('searchbox').waitFor();
     await page.screenshot({path:dir+'/'+prefix+(fullscreen?'-directory.png':'-recruiter.png')});
   }
-  console.log(prefix,mobile?'mobile':'desktop',await page.title(),{errors});
+  console.log(prefix,mobile?'mobile':'desktop',await page.title(),{release,errors});
   if(errors.length)process.exitCode=1;
   await context.close();
 }

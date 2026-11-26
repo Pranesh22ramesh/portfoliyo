@@ -1,17 +1,22 @@
 import * as T from 'three';
-import { blocked, districts, distance, entrance, parkedCars, pets, secret, spawn, type District, type DistrictId, type Point } from '@/lib/city';
+import { blocked, districts, distance, entrance, lookoutHeight, parkedCars, pets, secret, spawn, type District, type DistrictId, type Point } from '@/lib/city';
 import { roadRoute as route } from '@/lib/city-route';
 import { neighbors, type Neighbor } from '@/lib/neighbors';
-import { createMotion, enterExit, step, teleport, type Inputs } from '@/lib/city-motion';
+import { createMotion, enterExit, jump, step, teleport, type Inputs, type Motion } from '@/lib/city-motion';
+import { advanceTraffic, createTraffic, trafficSolid } from '@/lib/traffic';
+import { createSignals } from './traffic-visual';
+import { makeRoom } from './interior';
+import { roomBlocked,type RoomId } from '@/lib/rooms';
 import { makeContactShadows, skyDome } from './lighting';
-import { bakeParked, car, disposeWorld, person, town, wildlife, type CharacterRig } from './models';
+import { bakeParked, car, compactCar, disposeWorld, person, town, wildlife, type CharacterRig } from './models';
 
 export type Preferences = { quality:'low'|'medium'|'high'; light:'cycle'|'day'|'night'; audio:boolean; color:string; seenIntro:boolean };
 export type Stats = { fps:number; frame:number; draws:number; triangles:number; scale:number };
-export type Snapshot = Point & { angle:number; speed:number; driving:boolean; near:DistrictId|null; neighbor:number; pet:number; night:boolean };
+export type Snapshot = Point & { angle:number; speed:number; driving:boolean; near:DistrictId|null; neighbor:number; pet:number; night:boolean; height:number; room:RoomId|null; pace:'idle'|'walk'|'run'|'sprint'|'airborne' };
 export type Game = {
   destroy:()=>void; interact:()=>void; vehicle:()=>void; travel:(d?:District)=>void;
   settings:(p:Preferences)=>void; gps:(d?:District)=>void; pause:(v:boolean)=>void;
+  jump:()=>void; look:(radians:number)=>void; enterRoom:(id:RoomId)=>void; exitRoom:()=>void;
   photo:(angle:number|null,zoom?:number)=>void; capture:()=>string; skip:()=>void;
 };
 type Events = {
@@ -41,12 +46,27 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
   const city=town(!software); scene.add(city.root);
   const motion=createMotion(), vehicle=car(prefs.color,true), driver=person('#368481','#b77c56',2);
   scene.add(vehicle.root,driver.root);
+  const cars=createTraffic();
+  const outdoorSolid=(x:number,z:number,radius:number)=>blocked(x,z,radius)||trafficSolid(cars,x,z,radius);
+  const streetSignals=createSignals();
+  scene.add(streetSignals.mesh);
+  const trafficMeshes=cars.map(state=>{
+    if(software){
+      const mesh=bakeParked(compactCar(state.color));
+      if(mesh){scene.add(mesh);return {object:mesh,rig:null};}
+    }
+    const rig=car(state.color);
+    rig.root.scale.set(state.trim===1?.92:.96,state.trim===1?1.2:1,state.trim===2?1.05:.95);
+    scene.add(rig.root);
+    return {object:rig.root,rig};
+  });
   for(const {x,z,color} of parkedCars){
-    const parked=car(color);
-    parked.root.position.set(x,.11,z); parked.root.rotation.y=Math.PI/2; parked.lights.visible=false;
-    const model=bakeParked(parked.root);
+    const parked=software?null:car(color);
+    const root=parked?.root??compactCar(color);
+    root.position.set(x,.11,z); root.rotation.y=Math.PI/2;
+    const model=bakeParked(root);
     if(model)scene.add(model);
-    parked.paint.dispose();
+    parked?.paint.dispose();
   }
   const landlords=districts.map((d,i)=>{
     const p=person(d.color,['#9b654b','#cf956a','#e1aa82','#7c4d39'][i%4],i);
@@ -72,16 +92,18 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
   const shadows=makeContactShadows(2+parkedCars.length+landlords.length+crowds.length+animals.length);
   scene.add(shadows);
   const shadowMatrix=new T.Object3D();
-  function shadowAt(index:number,x:number,z:number,w:number,l:number,heading=0,y=.147){
+  function shadowAt(index:number,x:number,z:number,w:number,l:number,heading=0,y=.147,mesh=shadows){
     shadowMatrix.position.set(x,y,z);
     shadowMatrix.rotation.set(-Math.PI/2,0,-heading);
     shadowMatrix.scale.set(w,l,1);
     shadowMatrix.updateMatrix();
-    shadows.setMatrixAt(index,shadowMatrix.matrix);
+    mesh.setMatrixAt(index,shadowMatrix.matrix);
   }
   const target=new T.Vector3(), desired=new T.Vector3(), look=new T.Vector3(), droplet=new T.Object3D();
   camera.position.set(spawn.x+11,13,spawn.z+12);
   let quality=software?.43:1, paused=false, photo:number|null=null, photoZoom=1, routeTarget:District|undefined;
+  let room:{id:RoomId;saved:Motion;view:ReturnType<typeof makeRoom>}|undefined;
+  let cameraYaw=0,signalTick=-1;
   let time=0, intro=prefs.seenIntro?0:3.4, first=true, raf=0, last=0, nextHUD=0, nextGPS=0, previousVisit:DistrictId|null=null;
   let frames=0, sample=0, frameWorst=0, adaptiveCooldown=0, disposed=false, contextLost=false;
   let latestNear:District|undefined, latestPet=-1, latestNeighbor=-1, atSecret=false;
@@ -154,8 +176,41 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
       m.scale.x=distance(a,b); m.rotation.y=-Math.atan2(b.z-a.z,b.x-a.x);
     });
   };
+  const playerPose=()=>{
+    driver.root.visible=!motion.driving;
+    driver.root.position.set(motion.player.x,(room?0:.12+lookoutHeight(motion.player.x,motion.player.z))+motion.height,motion.player.z);
+    driver.root.rotation.y=motion.player.angle;
+    const rig=driver.setDetail(!motion.driving);
+    if(!rig)return;
+    const speed=Math.abs(motion.velocity);
+    animatePerson(rig,motion.stride,speed<.1?.018:Math.min(.83,.3+speed*.062));
+    if(motion.height>.045){
+      rig.legs[0].rotation.x=-.48;rig.legs[1].rotation.x=.19;
+      rig.knees[0].rotation.x=.94;rig.knees[1].rotation.x=.61;
+      rig.arms[0].rotation.x=-.42;rig.arms[1].rotation.x=-.30;
+    }else if(speed<.1){
+      rig.head.rotation.y=reduced?0:Math.sin(time*.94)*.07;
+      driver.root.position.y+=reduced?0:Math.sin(time*2)*.014;
+    }else rig.head.rotation.y=0;
+  };
   const paintFrame=(dt:number)=>{
     applySize();
+    playerPose();
+    if(room){
+      const walk=motion.player,aim=photo??(walk.angle+cameraYaw);
+      const radius=photo===null?4.5:4.5/photoZoom;
+      const clamp=T.MathUtils.clamp;
+      desired.set(clamp(walk.x-Math.sin(aim)*radius,-5.28,5.28),2.61+motion.height*.3,
+        clamp(walk.z-Math.cos(aim)*radius,-6.13,6.6));
+      camera.position.lerp(desired,first?1:1-Math.exp(-dt*9));
+      camera.lookAt(clamp(walk.x+Math.sin(aim)*1.7,-5.25,5.25),1.52+motion.height*.4,clamp(walk.z+Math.cos(aim)*1.7,-5.9,6.4));
+      shadowAt(0,walk.x,walk.z,.55,.59,0,.035,room.view.shadows);
+      room.view.shadows.instanceMatrix.needsUpdate=true;
+      room.view.animate(time);
+      renderer.render(room.view.scene,camera);
+      if(first){first=false;events.ready();}
+      return;
+    }
     const pose=motion.driving?motion.car:motion.player;
     const night=prefs.light==='night'?1:prefs.light==='day'?0:(1-Math.cos(time*.024))/2;
     sky.copy(daySky).lerp(nightSky,night);
@@ -165,16 +220,26 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
     atmosphere.material.uniforms.night.value=night;
     city.bulbs.emissiveIntensity=.03+night*1.65; city.water.uniforms.time.value=reduced?0:time; city.water.uniforms.night.value=night;
     vehicle.lights.visible=night>.43;
-    vehicle.root.position.set(motion.car.x,.12,motion.car.z); vehicle.root.rotation.y=motion.car.angle;
+    const carHeight=lookoutHeight(motion.car.x,motion.car.z);
+    const playerHeight=motion.driving?0:lookoutHeight(motion.player.x,motion.player.z);
+    vehicle.root.position.set(motion.car.x,.12+carHeight,motion.car.z); vehicle.root.rotation.y=motion.car.angle;
 
     const pace=Math.min(1,Math.abs(motion.velocity)/16);
     vehicle.root.rotation.z=reduced?0:motion.steering*pace*.024;
-    vehicle.root.rotation.x=reduced?0:Math.sin(time*7)*pace*.0026;
+    const noseX=Math.sin(motion.car.angle)*1.6,noseZ=Math.cos(motion.car.angle)*1.6;
+    const rise=lookoutHeight(motion.car.x+noseX,motion.car.z+noseZ)-lookoutHeight(motion.car.x-noseX,motion.car.z-noseZ);
+    vehicle.root.rotation.x=-Math.atan2(rise,3.2)+(reduced?0:Math.sin(time*7)*pace*.0026);
     vehicle.wheels.forEach(({pivot,roller},i)=>{roller.rotation.x=motion.wheels; pivot.rotation.y=i%2?motion.steering*.32:0;});
-    driver.root.visible=!motion.driving; driver.root.position.set(motion.player.x,.12,motion.player.z);
-    driver.root.rotation.y=motion.player.angle;
-    const driverRig=driver.setDetail(!motion.driving);
-    if(driverRig)animatePerson(driverRig,motion.stride,motion.velocity ? .68 : 0);
+    trafficMeshes.forEach(({object,rig},i)=>{
+      const state=cars[i];
+      object.visible=distance(state,pose)<(software?38:72);
+      if(!object.visible)return;
+      object.position.set(state.x,.12,state.z);
+      object.rotation.y=state.angle;
+      if(rig)rig.wheels.forEach(({roller})=>{roller.rotation.x=state.wheels;});
+    });
+    const signalFrame=Math.floor(time*4);
+    if(signalFrame!==signalTick){signalTick=signalFrame;streetSignals.update(time);}
     if(!paused && photo===null) {
       city.clouds.forEach((c,i)=>{c.position.x=-65+((15+i*29+time*.65)%160);});
       city.spray.visible=distance({x:60,z:-30},pose)<52;
@@ -210,16 +275,20 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
         const walking=n.motion==='walk', sitting=n.motion==='sit';
         const phase=time*.39+i*1.7;
         const patrolX=n.x+(walking?Math.sin(phase)*2.55:0);
-        const canWalk=walking&&!blocked(patrolX,n.z,.44);
-        const npcX=canWalk?patrolX:n.x;
+        const delta=patrolX-p.root.position.x;
+        const nextX=p.root.position.x+Math.sign(delta)*Math.min(1.08*dt,Math.abs(delta));
+        const canWalk=walking&&Math.abs(delta)>.025&&!outdoorSolid(nextX,n.z,.44)&&Math.hypot(nextX-pose.x,n.z-pose.z)>(motion.driving?2.2:.92);
+        const npcX=canWalk?nextX:p.root.position.x;
+        p.root.position.set(npcX,sitting?-.14:.18+lookoutHeight(npcX,n.z),n.z);
         const range=Math.hypot(npcX-pose.x,n.z-pose.z);
         const rangeLimit=software?23:quality<.68?32:44;
         p.root.visible=range<rangeLimit;
         if(!p.root.visible)return;
-        p.root.position.set(npcX,sitting?-.14:.18,n.z);
         const detailed=range<(software?10:22);
         const rig=p.setDetail(detailed);
-        p.root.rotation.y=canWalk?(Math.cos(phase)>0?Math.PI/2:-Math.PI/2):Math.sin(.48*time+i)*.19;
+        const facing=!motion.driving&&range<2.75?Math.atan2(pose.x-npcX,pose.z-n.z):
+          canWalk?(delta>0?Math.PI/2:-Math.PI/2):Math.sin(.48*time+i)*.19;
+        p.root.rotation.y+=Math.atan2(Math.sin(facing-p.root.rotation.y),Math.cos(facing-p.root.rotation.y))*Math.min(1,dt*7);
         if(rig){
           animatePerson(rig,time*5+i,canWalk?.36:.035);
           rig.head.rotation.y=Math.sin(time*.72+i)*.17;
@@ -237,12 +306,14 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
       });
       pins.forEach((pin,i)=>{pin.position.y=3.2+Math.sin(time*2+i)*.24; pin.rotation.y=pose.angle+Math.PI;});
     }
-    target.set(pose.x,motion.driving?1.25:1.55,pose.z);
-    const aim=photo??pose.angle;
+    const terrain=motion.driving?carHeight:playerHeight;
+    target.set(pose.x,terrain+(motion.driving?1.25:1.55+motion.height*.46),pose.z);
+    const aim=photo??(pose.angle+cameraYaw);
     const normalDistance=motion.driving?(camera.aspect<.8?11.4:9.5):5.9;
     const behind=photo===null?normalDistance:normalDistance/photoZoom;
     const introOrbit=intro>0?intro*.56:0;
     desired.set(pose.x-Math.sin(aim+introOrbit)*(behind+intro*5),motion.driving?(photo===null?5.9+intro*4.6:2.05+3.85/photoZoom):(photo===null?3.4:1.48+1.9/photoZoom),pose.z-Math.cos(aim+introOrbit)*(behind+intro*5));
+    desired.y+=Math.max(lookoutHeight(desired.x,desired.z),terrain);
     const buildingAt=(x:number,z:number)=>districts.some(d=>d.id!=='park'&&Math.abs(d.x-x)<8.3&&Math.abs(d.z-z)<7.4);
     for(let fraction=.2;fraction<=1;fraction+=.1){
       if(buildingAt(T.MathUtils.lerp(pose.x,desired.x,fraction),T.MathUtils.lerp(pose.z,desired.z,fraction))){
@@ -257,8 +328,8 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
     camera.lookAt(look);
     atmosphere.position.copy(camera.position);
     shadows.material.uniforms.strength.value=.37-night*.16;
-    shadowAt(0,motion.car.x,motion.car.z,1.88,2.85,motion.car.angle);
-    shadowAt(1,motion.player.x,motion.player.z,motion.driving?0:.61,motion.driving?0:.68);
+    shadowAt(0,motion.car.x,motion.car.z,1.88,2.85,motion.car.angle,.147+carHeight);
+    shadowAt(1,motion.player.x,motion.player.z,motion.driving?0:.61,motion.driving?0:.68,0,.147+playerHeight);
     let index=2;
     for(const parked of parkedCars)shadowAt(index++,parked.x,parked.z,1.7,2.65,Math.PI/2);
     for(const actor of shadowActors){
@@ -275,10 +346,10 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
   const sync=()=>{if(document.hidden||(paused&&photo===null&&!first))halt();else wake();};
   const updateHUD=(forced?:District)=>{
     const pose=motion.driving?motion.car:motion.player;
-      latestNear=forced??districts.find(d=>distance(entrance(d),pose)<8);
-      latestPet=motion.driving?-1:animals.slice(0,3).findIndex(a=>a.root.visible&&distance({x:a.root.position.x,z:a.root.position.z},pose)<3.2);
+      latestNear=room?undefined:forced??districts.find(d=>distance(entrance(d),pose)<8);
+      latestPet=motion.driving||room?-1:animals.slice(0,3).findIndex(a=>a.root.visible&&distance({x:a.root.position.x,z:a.root.position.z},pose)<3.2);
       latestNeighbor=-1;
-      if(!motion.driving){
+      if(!motion.driving&&!room){
         let range=2.65;
         crowds.forEach(({root},i)=>{
           const nearby=distance({x:root.position.x,z:root.position.z},pose);
@@ -286,9 +357,12 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
         });
       }
       if(latestNear && previousVisit!==latestNear.id)events.visit(latestNear.id);
-      atSecret=!motion.driving&&distance(secret,pose)<3.1;
+      atSecret=!motion.driving&&!room&&distance(secret,pose)<3.1;
       previousVisit=latestNear?.id??null;
-      events.update({...pose, speed:Math.abs(motion.velocity)*3.6,driving:motion.driving,near:previousVisit,neighbor:latestNeighbor,pet:latestPet,night:prefs.light==='night'||(prefs.light==='cycle'&&Math.cos(time*.024)<.12)});
+      const speed=Math.abs(motion.velocity);
+      const pace=motion.height>.04?'airborne':speed<.2?'idle':speed<3.4?'walk':speed<6.5?'run':'sprint';
+      renderer.domElement.dataset.traffic=room?'':String(cars.filter(car=>car.velocity>.2).length);
+      events.update({...pose,height:motion.height,room:room?.id??null,pace,speed:Math.abs(motion.velocity)*3.6,driving:motion.driving,near:previousVisit,neighbor:latestNeighbor,pet:latestPet,night:prefs.light==='night'||(prefs.light==='cycle'&&Math.cos(time*.024)<.12)});
   };
   const tick=(now:number)=>{
     raf=0;
@@ -300,10 +374,13 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
       intro=Math.max(0,intro-dt);
       time+=dt;
       const steps=Math.max(1,Math.ceil(dt/.032));
-      for(let i=0;i<steps;i++)step(motion,input,dt/steps);
+      const solid=room?roomBlocked:outdoorSolid;
+      if(!room)advanceTraffic(cars,time,dt,[motion.car,motion.driving?motion.car:motion.player]);
+      for(let i=0;i<steps;i++)step(motion,input,dt/steps,solid);
+      cameraYaw*=Math.exp(-dt*(Math.abs(motion.velocity)>1?.75:.11));
     }
     const pose=motion.driving?motion.car:motion.player;
-    if(now>nextGPS){nextGPS=now+230; refreshRoute(pose);}
+    if(!room&&now>nextGPS){nextGPS=now+230; refreshRoute(pose);}
     if(now>nextHUD){nextHUD=now+100;updateHUD();}
     paintFrame(dt);
     frames++; sample+=elapsed; frameWorst=Math.max(frameWorst,elapsed);
@@ -322,18 +399,41 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
   renderer.domElement.addEventListener('webglcontextlost',onLoss);
   document.addEventListener('visibilitychange',sync);
   wake();
+  function leaveRoom(){
+    if(!room)return;
+    const prior=room;
+    room=undefined;
+    scene.add(driver.root);
+    disposeWorld(prior.view.scene);
+    Object.assign(motion,prior.saved);
+    cameraYaw=0;first=true;updateHUD();wake();
+  }
   return {
-    destroy(){disposed=true;meshRequest.abort();window.clearTimeout(assetTimer);reflections?.dispose();paintNormal?.dispose();halt();document.removeEventListener('visibilitychange',sync);observer.disconnect();renderer.domElement.removeEventListener('webglcontextlost',onLoss);disposeWorld(scene);renderer.dispose();renderer.domElement.remove();},
+    destroy(){if(room){const old=room;room=undefined;scene.add(driver.root);disposeWorld(old.view.scene);}disposed=true;meshRequest.abort();window.clearTimeout(assetTimer);reflections?.dispose();paintNormal?.dispose();halt();document.removeEventListener('visibilitychange',sync);observer.disconnect();renderer.domElement.removeEventListener('webglcontextlost',onLoss);disposeWorld(scene);renderer.dispose();renderer.domElement.remove();},
     interact(){
       updateHUD();
+      if(room){events.note('Use the Exit building button to return outside.');return;}
       if(atSecret){events.note(secret.name+': '+secret.line);return;}
       if(latestPet!==-1){events.pet(latestPet);return;}
       if(latestNeighbor!==-1){events.neighbor(neighbors[latestNeighbor]);return;}
       if(latestNear){events.open(latestNear);return;}
       events.note('Follow a destination pin or open the city map.');
     },
-    vehicle(){events.note(enterExit(motion));updateHUD();},
-    travel(d){teleport(motion,d); intro=0; first=true; updateHUD(d); wake();},
+    vehicle(){if(room)return;events.note(enterExit(motion,outdoorSolid));updateHUD();},
+    jump(){jump(motion);},
+    look(radians){cameraYaw=T.MathUtils.clamp(cameraYaw+radians,-Math.PI,Math.PI);},
+    enterRoom(id){
+      if(room)return;
+      const saved=structuredClone(motion);
+      const view=makeRoom(id);
+      room={id,saved,view};
+      Object.assign(motion,createMotion(),{driving:false,player:{x:0,z:3.55,angle:Math.PI}});
+      shadowAt(1,0,-2.25,id==='garage'?2.58:1.46,id==='garage'?1.29:1.46,0,.035,view.shadows);
+      view.scene.add(driver.root);
+      intro=0;cameraYaw=0;first=true;updateHUD();wake();
+    },
+    exitRoom:leaveRoom,
+    travel(d){leaveRoom();teleport(motion,d); cameraYaw=0;intro=0; first=true; updateHUD(d); wake();},
     settings(value){const changed=prefs.quality!==value.quality; prefs=value;vehicle.paint.color.set(prefs.color);if(changed){quality=software?.43:1;resize();}},
     gps(d){routeTarget=d;refreshRoute(motion.driving?motion.car:motion.player);},
     pause(value){paused=value;sync();},

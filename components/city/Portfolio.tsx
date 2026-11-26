@@ -15,7 +15,7 @@ export function Portfolio({id,onDetail}:{id:DistrictId;onDetail?:(kind:DetailKin
       <div><h3>Pranesh Ramesh</h3><p>I’m a Software Systems student building full stack web and mobile applications. I’m interested in cloud engineering, practical machine learning and cybersecurity.</p>
       <a className="dw-button dw-primary" href="/resume.pdf" download>Download Resume</a></div>
     </div>;
-    case 'garage': return <><p>Drive with WASD or the arrow keys. Hold Space to brake, press F to get in or out and E to interact. On touch screens, use the joystick and action buttons.</p><p>Open Settings in the city to change the car’s paint, graphics, lighting or audio.</p></>;
+    case 'garage': return <><p>Drive with WASD or the arrow keys. Hold Space to brake and press F to get in or out. On foot, hold X to walk, Shift to sprint and tap Space to jump. E interacts and P opens the field phone. On touch screens, use the joystick and action buttons.</p><p>Open Settings in the city to change the car’s paint, graphics, lighting or audio.</p></>;
     case 'projects': return <div className="dw-entries">{projects.map(p=>{
       const link=projectLink(p);
       return <article key={p.id}>

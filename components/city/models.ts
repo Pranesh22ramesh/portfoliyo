@@ -1,7 +1,7 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { neighborhood } from './neighborhood';
-import { makeFoothills, riverfront } from './riverfront';
+import { makeFoothills, makePondLookout, riverfront } from './riverfront';
 import { headlightPools } from './lighting';
 import { facade, makeSigns, streetscape } from './scenery';
 import { columns, districts, entrance, secret, shop, streets } from '@/lib/city';
@@ -112,6 +112,21 @@ export function bakeParked(group:T.Group) {
   const geometry=combine(geometries);
   group.traverse(o=>{if(o instanceof T.Mesh&&!sharedGeometries.has(o.geometry))o.geometry.dispose();});
   return geometry?new T.Mesh(geometry,vertexPaint):null;
+}
+export function compactCar(color:string) {
+  const root=new T.Group();
+  pieces(root,[[0,0,0,1,1,1,color,body],[0,0,0,1,1,1,'#486772',glass],
+    [0,1.62,-.37,1.35,.055,.84,color],[0,.41,0,1.76,.18,4.24,'#243333']]);
+  for(const side of [-1,1]){
+    pieces(root,[[side*.72,.87,-2.13,.52,.09,.09,'#dc7466'],[side*.73,.67,2.02,.42,.065,.24,'#e1e1bb']]);
+    for(const z of [-1.32,1.3]){
+      const tire=mesh([side*1.08,.42,z,.83,.38,.83,'#273030',bevel]);
+      const hub=mesh([side*1.273,.42,z,.43,.055,.43,'#9aa499',bevel]);
+      tire.rotation.z=hub.rotation.z=-side*Math.PI/2;
+      root.add(tire,hub);
+    }
+  }
+  return root;
 }
 export function car(color:string, showCabin=false) {
   const root=new T.Group();
@@ -236,7 +251,11 @@ function makePersonRig(color:string, skin:string, style:number) {
   }
   if(style===7)pieces(root,[[0,1.44,.182,.118,.23,.045,'#d4b582'],[.154,1.39,.189,.09,.063,.028,'#e4c37a']]);
   if(style===9)pieces(root,[[0,1.12,-.243,.48,.47,.26,'#a36a45'],[0,1.32,-.376,.45,.073,.049,'#dfac6e']]);
-  if(style%4===2)pieces(root,[[0,1.24,-.218,.47,.43,.24,'#9e673e',oval],[0,1.37,-.32,.33,.24,.08,'#67493a',oval]]);
+  if(style%4===2)pieces(root,[
+    [0,1.19,-.245,.41,.45,.25,'#856047',oval],[0,1.29,-.336,.39,.28,.095,'#b58a5e',oval],
+    [0,1.122,-.354,.267,.171,.069,'#684e3b',oval],[0,1.172,-.39,.204,.023,.014,'#d6af74'],
+    [-.142,1.336,-.149,.049,.29,.064,'#6d5441'],[.142,1.336,-.149,.049,.29,.064,'#6d5441'],
+  ]);
   const legs:T.Group[]=[], arms:T.Group[]=[], knees:T.Group[]=[], elbows:T.Group[]=[];
   for(const side of [-1,1]){
     const leg=new T.Group();leg.position.set(side*.129,.84,0);root.add(leg);
@@ -479,7 +498,7 @@ export function town(textured=true) {
   permanent(secret.x,1.39,secret.z-.25,.48,.43,.18,'#ffe08a',ball);
   neighborhood(permanent);
   riverfront(permanent,textured);
-  root.add(makeFoothills(textured));
+  root.add(makeFoothills(textured),makePondLookout(permanent));
   streetscape(permanent);
   root.add(makeSigns());
   const random=(i:number)=>{const v=Math.sin(i*91.492+17.1)*43758.54; return v-Math.floor(v);};
@@ -524,7 +543,6 @@ export function town(textured=true) {
     permanent(lx-.96,3.26,lz,.57,.19,.35,'#fff0b8');
     permanent(x-7.05,1.1,z-5.2,.13,2.2,.13,'#445267');
     permanent(x-7.05,2.28,z-5.2,.36,.74,.32,'#263347');
-    for(let i=0;i<3;i++)permanent(x-7.05,2+i*.22,z-5,.15,.15,.07,['#79d781','#ffcb64','#ff7764'][i],ball);
   }
   for (const [x,z] of [[53,-23],[66,-37],[54,-52],[69,-50],[-28,41],[28,-19]]) {
     permanent(x,.54,z,2,.18,.62,'#bf8053');
@@ -584,7 +602,13 @@ export function town(textured=true) {
 export function disposeWorld(scene:T.Scene) {
   const geometries=new Set<T.BufferGeometry>();
   const mats=new Set<T.Material>();
-  scene.traverse(o=>{ if(o instanceof T.SkinnedMesh)o.skeleton.dispose();const m=o as T.Mesh; if(m.geometry)geometries.add(m.geometry); if(m.material) (Array.isArray(m.material)?m.material:[m.material]).forEach(v=>mats.add(v)); });
+  scene.traverse(o=>{
+    if(o instanceof T.SkinnedMesh)o.skeleton.dispose();
+    if(o instanceof T.InstancedMesh)o.dispose();
+    const m=o as T.Mesh;
+    if(m.geometry)geometries.add(m.geometry);
+    if(m.material)(Array.isArray(m.material)?m.material:[m.material]).forEach(v=>mats.add(v));
+  });
   geometries.forEach(g=>{if(!sharedGeometries.has(g))g.dispose();});
   const maps=new Set<T.Texture>();
   mats.forEach(m=>{const map=(m as T.MeshBasicMaterial).map;if(map)maps.add(map);if(m!==vertexPaint&&m!==townPaint&&!Array.from(materials.values()).includes(m as T.MeshStandardMaterial))m.dispose();});

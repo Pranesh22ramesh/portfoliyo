@@ -1,5 +1,5 @@
 import * as T from 'three';
-import { columns } from '@/lib/city';
+import { columns, lookoutHeight, lookoutPosts, pondLookout } from '@/lib/city';
 import type { Shape } from './models';
 
 type Place = (...shape:Shape)=>void;
@@ -7,6 +7,38 @@ const stone=new T.DodecahedronGeometry(.5);
 const log=new T.CylinderGeometry(.43,.5,1,9);
 const brick='#bdab8b';
 const rail='#3c5e55';
+
+export function makePondLookout(put:Place){
+  const {x,z,width,depth}=pondLookout;
+  const hill=new T.PlaneGeometry(width,depth,28,16).rotateX(-Math.PI/2).translate(x,.014,z);
+  const pos=hill.getAttribute('position');
+  const rgb=new Float32Array(pos.count*3);
+  const grass=new T.Color('#82b97f'), path=new T.Color('#b9a687'), color=new T.Color();
+  for(let i=0;i<pos.count;i++){
+    const gx=pos.getX(i),gz=pos.getZ(i);
+    const lift=lookoutHeight(gx,gz);
+    pos.setY(i,lift+.014);
+    color.copy(grass).lerp(path,T.MathUtils.smoothstep(lift,.015,.17)*
+      (1-T.MathUtils.smoothstep(Math.abs(gz-z-.27*Math.sin((gx-x)*.57)),.65,1.22)));
+    rgb.set([color.r,color.g,color.b],3*i);
+  }
+  hill.computeVertexNormals();
+  hill.setAttribute('color',new T.BufferAttribute(rgb,3));
+  for(const post of lookoutPosts){
+    const base=lookoutHeight(post.x,post.z);
+    put(post.x,(3.67+base)/2,post.z,.18,3.67-base,.18,rail);
+    put(post.x,base+.19,post.z,.25,.32,.25,brick);
+  }
+  for(const side of [-1,1])put(x,3.74,z+side*.95,4.85,.19,.17,rail);
+  for(let i=0;i<10;i++)put(x+(i-4.5)*.5,3.89,z,.095,.135,2.45,'#a88361');
+  for(const [y,thickness] of [[1.44,.083],[1.13,.057]])put(x,y,-65.75,4.62,thickness,.14,rail);
+  for(const [dx,dz] of [[-6.4,-1.32],[-5.75,1.06],[-3.48,-1.38],[4.15,1.4],[5.3,-1.38],[6.6,1.01]]){
+    const px=x+dx,pz=z+dz,base=lookoutHeight(px,pz);
+    put(px,base+.18,pz,.76,.38,.58,'#7c9167',stone,dx);
+    put(px-.28,base+.25,pz+.16,.33,.3,.32,dx>0?'#dab071':'#bb8d89',stone,dz);
+  }
+  return new T.Mesh(hill,new T.MeshLambertMaterial({vertexColors:true}));
+}
 
 /** Landscaped banks stay outside bridge and navigation clearances. */
 export function riverfront(put:Place,full:boolean){

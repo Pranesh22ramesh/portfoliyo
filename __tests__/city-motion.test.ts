@@ -1,6 +1,6 @@
 import { blocked, districts, entrance, parking, spawn } from '@/lib/city';
 import { roadRoute as route } from '@/lib/city-route';
-import { createMotion, emptyInput, enterExit, step, teleport } from '@/lib/city-motion';
+import { createMotion, emptyInput, enterExit, jump, step, teleport } from '@/lib/city-motion';
 
 test('bridges cross the river and the river blocks crossing elsewhere',()=>{
   expect(blocked(15,0,1.7)).toBe(false);
@@ -46,4 +46,26 @@ test('GPS reaches every parking bay while avoiding blocked terrain',()=>{
       }
     });
   }
+});
+
+test('walking, running and sprinting accelerate, then jumping returns to the ground',()=>{
+  const m=createMotion(),input=emptyInput();
+  enterExit(m);
+  const clear=()=>false;
+  input.up=true;input.walk=true;
+  for(let i=0;i<60;i++)step(m,input,1/60,clear);
+  expect(m.velocity).toBeCloseTo(3.05);
+  input.walk=false;
+  for(let i=0;i<45;i++)step(m,input,1/60,clear);
+  expect(m.velocity).toBeCloseTo(5.75);
+  input.sprint=true;
+  for(let i=0;i<45;i++)step(m,input,1/60,clear);
+  expect(m.velocity).toBeCloseTo(8.6);
+  jump(m);
+  for(let i=0;i<16;i++)step(m,input,1/60,clear);
+  expect(m.height).toBeGreaterThan(.5);
+  input.up=false;
+  for(let i=0;i<50;i++)step(m,input,1/60,clear);
+  expect(m.height).toBe(0);
+  expect(m.vertical).toBe(0);
 });

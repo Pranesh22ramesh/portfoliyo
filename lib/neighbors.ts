@@ -11,6 +11,7 @@ export const neighbors = [
   {name:'Pavi',role:'Park visitor',line:'The duck knows more about debugging than my entire group project.',x:66,z:-36,motion:'sit',color:'#dc947f',skin:'#936849',outfit:3},
   {name:'Kiran',role:'Cyclist',line:'I switched to two wheels after the GPS sent me through a fountain.',x:22,z:22,motion:'walk',color:'#649c9c',skin:'#c19067',outfit:6},
   {name:'Leela',role:'Museum visitor',line:'I came for the awards. I stayed for the air conditioning.',x:22,z:-21.8,motion:'walk',color:'#ad8075',skin:'#8b5f4d',outfit:8},
+  {name:'Tara',role:'Trail steward',line:'Follow the path up to the pond lookout. Across the north road, the Research Center has an exhibit on machine learning.',x:53.8,z:-66.5,motion:'stand',color:'#baa16d',skin:'#96664e',outfit:6},
 ] as const;
 
 export type Neighbor = typeof neighbors[number];

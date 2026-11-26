@@ -24,6 +24,13 @@ export const parkedCars = [
   {x:-37,z:-44,color:'#52a992'}, {x:9,z:-42,color:'#d6ddbb'},
 ];
 export const shop={x:30,z:-61};
+export const pondLookout={x:60,z:-66.7,width:16.8,depth:5.6};
+export const lookoutPosts=[{x:57.8,z:-67.65},{x:62.2,z:-67.65},{x:57.8,z:-65.75},{x:62.2,z:-65.75}];
+export function lookoutHeight(x:number,z:number) {
+  const u=Math.max(0,1-((x-pondLookout.x)/(pondLookout.width/2))**2);
+  const v=Math.max(0,1-((z-pondLookout.z)/(pondLookout.depth/2))**2);
+  return .92*u*u*v*v;
+}
 export const secret={x:36,z:-67,name:'The Debugger’s Bench',line:'Build passed on the first try. This bench commemorates the occasion.'};
 export const pets = [
   { x: 55, z: -32, name: 'Byte the dog', line: 'Byte fetched a byte. It was a very short stick.' },
@@ -37,6 +44,8 @@ export function blocked(x: number, z: number, r: number) {
   if (x-r < bounds.left || x+r > bounds.right || z-r < bounds.top || z+r > bounds.bottom) return true;
   if (Math.abs(z) < 7+r && !columns.some(c => Math.abs(c-x) < 5.6-r)) return true;
   if (((x-61)/9)**2 + ((z+57)/7)**2 < (1+r/7)**2) return true;
+  if (lookoutPosts.some(p=>Math.abs(x-p.x)<.10+r&&Math.abs(z-p.z)<.10+r)) return true;
+  if (Math.abs(x-60)<2.25+r&&Math.abs(z+65.75)<.10+r) return true;
   if(Math.abs(x-shop.x)<6.6+r&&Math.abs(z-shop.z)<4.1+r)return true;
   if(parkedCars.some(p=>Math.abs(x-p.x)<2.15+r&&Math.abs(z-p.z)<1.2+r))return true;
   return districts.some(d => d.id !== 'park' && Math.abs(x-d.x)<8+r && Math.abs(z-d.z)<7+r);

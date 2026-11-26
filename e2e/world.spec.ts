@@ -117,6 +117,16 @@ test('mobile touch controls and layout',async({browser},info)=>{
   expect(overflow).toEqual({x:0,y:0});
   await page.getByRole('button',{name:'Settings'}).click();
   console.log('mobile software renderer',await page.getByTestId('world-performance').innerText());
+  await page.getByRole('button',{name:'Close panel'}).click();
+  await page.goto('/#research');
+  await expect(page.getByRole('dialog').getByRole('button',{name:'Enter building'})).toBeEnabled({timeout:20000});
+  await page.getByRole('dialog').getByRole('button',{name:'Enter building'}).tap();
+  const world=page.getByRole('region',{name:'Developer World driving game'});
+  await expect(world).toHaveAttribute('data-room','research');
+  await page.getByRole('button',{name:'Jump',exact:true}).tap();
+  await expect(world).toHaveAttribute('data-pace','airborne');
+  await page.getByRole('button',{name:'Exit building'}).tap();
+  await expect(page.getByRole('button',{name:'Exit car'})).toBeVisible();
   await context.close();
 });
 
@@ -210,4 +220,51 @@ test('viewport and overlays stay scroll-contained after resize',async({page})=>{
   await dialog.getByRole('searchbox').fill('wasd');
   await expect(world.locator('.dw-speed')).toHaveAttribute('aria-label','0 kilometres per hour');
   expect(await page.evaluate(()=>scrollY)).toBe(0);
+});
+
+test('walk, sprint, jump and explore the Garage interior',async({page},info)=>{
+  await page.goto('/#garage');
+  const world=page.getByRole('region',{name:'Developer World driving game'});
+  const dialog=page.getByRole('dialog');
+  await expect(dialog.getByRole('button',{name:'Enter building'})).toBeEnabled({timeout:25000});
+  await dialog.getByRole('button',{name:'Enter building'}).click();
+  await expect(world).toHaveAttribute('data-room','garage');
+  await expect(page.getByText('Garage showroom',{exact:true})).toBeVisible();
+  await page.screenshot({path:info.outputPath('garage-showroom.png')});
+  await world.focus();
+  await page.keyboard.press('Space');
+  await expect(world).toHaveAttribute('data-pace','airborne');
+  await expect(world).toHaveAttribute('data-pace','idle');
+  await page.keyboard.down('Shift');
+  await page.keyboard.down('w');
+  await expect(world).toHaveAttribute('data-pace','sprint',{timeout:10000});
+  await page.keyboard.up('w');
+  await page.keyboard.up('Shift');
+  await page.getByRole('button',{name:'Exit building'}).click();
+  await expect(world).not.toHaveAttribute('data-room','garage');
+  await expect(page.getByRole('button',{name:'Exit car'})).toBeVisible();
+});
+
+test('traffic renders and a phone mission can be completed and saved',async({page},info)=>{
+  await page.goto('/');
+  const world=page.getByRole('region',{name:'Developer World driving game'});
+  const dialog=page.getByRole('dialog');
+  await expect(page.getByRole('button',{name:'Exit car'})).toBeVisible({timeout:20000});
+  await expect(world.locator('canvas')).toHaveAttribute('data-traffic',/^[1-9]/);
+  await page.getByRole('button',{name:'Field phone',exact:true}).click();
+  await expect(dialog.getByRole('heading',{name:'Field phone'})).toBeVisible();
+  await page.screenshot({path:info.outputPath('field-phone.png')});
+  const mission=dialog.getByRole('listitem').filter({hasText:'First build'});
+  await mission.getByRole('button',{name:'Set mission GPS'}).click();
+  await expect(world.getByRole('button',{name:'Clear GPS'})).toBeVisible();
+  await world.getByRole('button',{name:'Clear GPS'}).click();
+  await page.getByRole('button',{name:'Field phone',exact:true}).click();
+  await mission.getByRole('button',{name:'Set mission GPS'}).click();
+  await page.getByRole('button',{name:'Open city map'}).click();
+  await dialog.getByRole('button',{name:'Project Lab',exact:true}).last().click();
+  await dialog.getByRole('button',{name:'Fast travel'}).click();
+  await expect(page.getByText('Mission complete: First build',{exact:true})).toBeVisible();
+  await page.reload();
+  await page.getByRole('button',{name:'Field phone',exact:true}).click();
+  await expect(mission.getByRole('button',{name:'Completed'})).toBeDisabled();
 });

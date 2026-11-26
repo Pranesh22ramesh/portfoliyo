@@ -1,5 +1,16 @@
 # Developer World progress
 
+## City driving and on-foot exploration
+
+- Added walking, running, sprinting, jumping, ground collision, and a third-person orbit camera. Keyboard and touch controls support both driving and on-foot play.
+- Added six traffic cars on four lane loops. Traffic uses the same signal phases as the visible lights, yields to nearby obstacles, and blocks the player and roadster. A simpler mesh is used on software renderers.
+- Added the Garage showroom, Research Gallery, and a walkable pond lookout with an approach path and a trail steward. Leaving an interior restores the outdoor vehicle and player state. Sidewalk pedestrians yield and turn toward nearby players.
+- Added a field phone with four optional GPS missions. Local storage preserves completed missions. Recruiters can open all ten destination panels and the Resume directly from the HUD.
+- Verified the previous production page served `78403ba`, so the unchanged opening view was reproducible on the deployed commit. The GitHub-listed Certificate Generator sign-in returned 200. The Bouquet Shop deployment returned 404, so its project retains the GitHub repository link.
+- Captured matched desktop and touch viewport screenshots before and after, plus the interiors and phone, in `artifacts/visual-qa/city-drive`. Passed the production build, TypeScript, lint, 14 Jest tests, and 10 Playwright scenarios. The desktop and touch tour opened the game and phone without document scrolling. The desktop tour also opened all ten district panels and both interiors.
+
+The art uses stylized geometry with an original Roadster GLB. Traffic uses lane rules, pedestrians use short patrols, and movement uses kinematic collision. Physical phone performance, battery life, and sustained memory use were outside the measured browser runs.
+
 ## Full-screen game and deployment correction
 
 - [x] Audited production before the change. GitHub contained the roadster update and a retry, but neither had a Vercel status. The public site still exposed the old scrolling Recruiter Mode and returned 404 for the roadster GLB. The last publicly confirmed successful Vercel commit was e94c166. These observations establish a deployment gap. The reason Vercel missed the later GitHub pushes requires authenticated project logs.
