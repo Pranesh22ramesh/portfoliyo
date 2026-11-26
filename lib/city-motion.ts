@@ -1,4 +1,4 @@
-import { blocked, distance, parking, spawn, type District, type Point } from './city';
+import { blocked, distance, parking, spawn, waterDepth, type District, type Point } from './city';
 
 export const keys = ['up', 'down', 'left', 'right', 'brake', 'sprint', 'walk'] as const;
 export type InputKey = typeof keys[number];
@@ -6,7 +6,7 @@ export type Inputs = Record<InputKey, boolean>;
 export const emptyInput = (): Inputs => ({ up:false, down:false, left:false, right:false, brake:false, sprint:false, walk:false });
 export type Pose = Point & { angle: number };
 export function createMotion() {
-  return { car: { ...spawn }, player: { ...spawn }, driving: true, velocity: 0, steering: 0, stride: 0, wheels: 0, height:0, vertical:0, jumpHeld:false, turnRate:0 };
+  return { car: { ...spawn }, player: { ...spawn }, driving: true, velocity: 0, steering: 0, stride: 0, wheels: 0, height:0, vertical:0, jumpHeld:false, turnRate:0, health:100, impact:0, water:0, submerged:0 };
 }
 export type Motion = ReturnType<typeof createMotion>;
 export function teleport(m: Motion, d?: District) {
@@ -41,14 +41,21 @@ export type Solid = (x:number,z:number,radius:number)=>boolean;
 export function jump(m:Motion){
   if(!m.driving&&m.height===0&&m.vertical===0)m.vertical=5.65;
 }
+export function repair(m:Motion){m.health=100;m.impact=0;m.submerged=0;m.water=0;}
+export function recover(m:Motion){teleport(m);}
 
 export function step(m: Motion, input: Inputs, dt: number, solid:Solid=blocked) {
   const throttle = Number(input.up)-Number(input.down);
   const turn = Number(input.left)-Number(input.right);
   const pose = m.driving ? m.car : m.player;
   if (m.driving) {
-    const target = throttle > 0 ? 24 : throttle < 0 ? -8 : 0;
+    m.impact=0;
+    const depth=waterDepth(pose.x,pose.z);
+    m.water=depth;
+    m.submerged=depth>.62?m.submerged+dt:0;
+    const target = depth>.62||m.health<=0?0:throttle > 0 ? 24 : throttle < 0 ? -8 : 0;
     m.velocity = approach(m.velocity,input.brake?0:target,dt*(input.brake?32:throttle?9:4.7));
+    m.velocity*=Math.max(0,1-depth*dt*1.6);
     m.steering = approach(m.steering,turn,dt*6);
     pose.angle += dt*m.steering*Math.sign(m.velocity)*Math.min(Math.abs(m.velocity)*.23,1.85);
     m.wheels -= m.velocity*dt/.43;
@@ -71,7 +78,12 @@ export function step(m: Motion, input: Inputs, dt: number, solid:Solid=blocked) 
   m.jumpHeld=input.brake;
   const clear = (a:number,b:number) => !solid(a,b,radius) && (m.driving || distance({x:a,z:b},m.car)>1.45);
   if (clear(x,z)) { pose.x=x; pose.z=z; }
-  else if (m.driving) m.velocity *= -.17;
+  else if (m.driving) {
+    const speed=Math.abs(m.velocity);
+    m.impact=speed;
+    if(speed>3.5)m.health=Math.max(0,m.health-Math.max(1,(speed-3.5)**1.3*.68));
+    m.velocity *= -.17;
+  }
   else if (clear(x,pose.z)) pose.x=x;
   else if (clear(pose.x,z)) pose.z=z;
   else m.velocity=0;

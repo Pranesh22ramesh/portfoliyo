@@ -40,10 +40,15 @@ export const pets = [
 export function entrance(d: District): Point { return { x: d.x + 5, z: d.z + 10 }; }
 export function parking(d: District) { return { x: d.x + 4, z: d.z + 14, angle: Math.PI / 2 }; }
 export function distance(a: Point, b: Point) { return Math.hypot(a.x - b.x, a.z - b.z); }
-export function blocked(x: number, z: number, r: number) {
+export function waterDepth(x:number,z:number){
+  if(Math.abs(z)<7.1&&x>-57&&x<86)return 1.9;
+  const pond=((x-61)/9)**2+((z+57)/7)**2;
+  return pond<1?1.1*(1-pond):0;
+}
+export function blocked(x: number, z: number, r: number, allowWater=false) {
   if (x-r < bounds.left || x+r > bounds.right || z-r < bounds.top || z+r > bounds.bottom) return true;
-  if (Math.abs(z) < 7+r && !columns.some(c => Math.abs(c-x) < 5.6-r)) return true;
-  if (((x-61)/9)**2 + ((z+57)/7)**2 < (1+r/7)**2) return true;
+  if (!allowWater&&Math.abs(z) < 7+r && !columns.some(c => Math.abs(c-x) < 5.6-r)) return true;
+  if (!allowWater&&((x-61)/9)**2 + ((z+57)/7)**2 < (1+r/7)**2) return true;
   if (lookoutPosts.some(p=>Math.abs(x-p.x)<.10+r&&Math.abs(z-p.z)<.10+r)) return true;
   if (Math.abs(x-60)<2.25+r&&Math.abs(z+65.75)<.10+r) return true;
   if(Math.abs(x-shop.x)<6.6+r&&Math.abs(z-shop.z)<4.1+r)return true;

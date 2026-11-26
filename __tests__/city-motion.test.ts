@@ -1,6 +1,6 @@
-import { blocked, districts, entrance, parking, spawn } from '@/lib/city';
+import { blocked, districts, entrance, parking, spawn, waterDepth } from '@/lib/city';
 import { roadRoute as route } from '@/lib/city-route';
-import { createMotion, emptyInput, enterExit, jump, step, teleport } from '@/lib/city-motion';
+import { createMotion, emptyInput, enterExit, jump, recover, repair, step, teleport } from '@/lib/city-motion';
 
 test('bridges cross the river and the river blocks crossing elsewhere',()=>{
   expect(blocked(15,0,1.7)).toBe(false);
@@ -11,6 +11,27 @@ test('bridges cross the river and the river blocks crossing elsewhere',()=>{
     expect(blocked(p.x,p.z,1.7)).toBe(false);
     expect(route(spawn,location).slice(-1)[0]).toEqual(entrance(location));
   }
+});
+
+test('vehicle impact reduces condition, water stalls it, and recovery restores driving',()=>{
+  const m=createMotion(),input=emptyInput();
+  m.velocity=18;
+  step(m,input,1/60,()=>true);
+  expect(m.impact).toBeGreaterThan(8);
+  expect(m.health).toBeLessThan(100);
+  repair(m);
+  expect(m.health).toBe(100);
+  expect(waterDepth(0,0)).toBeGreaterThan(1);
+  expect(blocked(0,0,1.7,true)).toBe(false);
+  Object.assign(m.car,{x:0,z:0});
+  input.up=true;
+  for(let i=0;i<170;i++)step(m,input,1/60,()=>false);
+  expect(m.water).toBeGreaterThan(1);
+  expect(m.submerged).toBeGreaterThan(2.8);
+  expect(m.velocity).toBeLessThan(1);
+  recover(m);
+  expect(m.car).toEqual(spawn);
+  expect(m.health).toBe(100);
 });
 
 test('acceleration, braking, reverse, exit and reset',()=>{

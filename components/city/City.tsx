@@ -17,7 +17,7 @@ import { Directory } from './Directory';
 
 const defaults:Preferences={quality:'medium',light:'cycle',audio:false,color:'#ff664d',seenIntro:false};
 const paint=['#ff664d','#5cb6ff','#a994ff','#8ce2a4','#ffc556','#eef3ff'];
-const initial:Snapshot={...spawn,speed:0,driving:true,near:null,neighbor:-1,pet:-1,night:false,height:0,room:null,pace:'idle'};
+const initial:Snapshot={...spawn,speed:0,driving:true,health:100,water:0,near:null,neighbor:-1,pet:-1,night:false,height:0,room:null,pace:'idle'};
 const directions:Record<string,InputKey>={KeyW:'up',ArrowUp:'up',KeyS:'down',ArrowDown:'down',KeyA:'left',ArrowLeft:'left',KeyD:'right',ArrowRight:'right',Space:'brake',ShiftLeft:'sprint',ShiftRight:'sprint',KeyX:'walk'};
 const aliases:Record<string,string>={education:'university',certifications:'achievements',about:'home'};
 type Detail = {kind:'project'|'credential';id:string;origin:DistrictId};
@@ -290,6 +290,8 @@ export function City(){
       <div className="dw-hud">
         {!hud.room&&<button className="dw-map-button" onClick={()=>open('map')} aria-label="Open city map"><CityMap hud={hud} goal={goal}/></button>}
         <div className="dw-speed" aria-label={Math.round(hud.speed)+' kilometres per hour'}><Gauge size={19}/><strong>{Math.round(hud.speed)}</strong><span>km/h</span><i style={{width:Math.min(100,hud.speed/86*100)+'%'}} aria-hidden="true"/></div>
+        {hud.driving&&hud.health<100&&<div className="dw-condition" role="status">Vehicle {Math.round(hud.health)}% <button onClick={()=>game.current?.repair()}>Repair</button></div>}
+        {hud.driving&&hud.water>.1&&<div className="dw-condition" role="status">Water hazard <button onClick={()=>game.current?.recover()}>Recover</button></div>}
       </div>
       <div className="dw-game-actions">
         {hud.room?<button onClick={()=>game.current?.exitRoom()}>Exit building</button>:<button onClick={()=>{game.current?.vehicle();shell.current?.focus();}}><Car size={17}/>{hud.driving?'Exit car':'Enter car'}</button>}

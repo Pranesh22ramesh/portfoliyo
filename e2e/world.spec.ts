@@ -79,7 +79,8 @@ test('in-game directory, deep links, credentials and invalid routes',async({page
   await forensiq.getByRole('link',{name:'Read case study'}).click();
   await expect(dialog.getByRole('heading',{name:'ForensIQ'})).toBeVisible();
   await expect(dialog.getByRole('link',{name:'View GitHub repository'})).toHaveCount(0);
-  await page.goto('/#portfolio');
+  await dialog.getByRole('button',{name:'Back to destination'}).click();
+  await dialog.getByRole('button',{name:'All destinations'}).click();
   await search.fill('cisco');
   await dialog.getByRole('button',{name:/Achievement Museum/}).click();
   await expect(dialog.getByRole('heading',{name:'Achievement Museum'})).toBeVisible();

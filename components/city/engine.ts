@@ -2,7 +2,7 @@ import * as T from 'three';
 import { blocked, districts, distance, entrance, lookoutHeight, parkedCars, pets, secret, spawn, type District, type DistrictId, type Point } from '@/lib/city';
 import { roadRoute as route } from '@/lib/city-route';
 import { neighbors, type Neighbor } from '@/lib/neighbors';
-import { createMotion, enterExit, jump, step, teleport, type Inputs, type Motion } from '@/lib/city-motion';
+import { createMotion, enterExit, jump, recover, repair, step, teleport, type Inputs, type Motion } from '@/lib/city-motion';
 import { advanceTraffic, createTraffic, trafficSolid } from '@/lib/traffic';
 import { createSignals } from './traffic-visual';
 import { makeRoom } from './interior';
@@ -12,11 +12,12 @@ import { bakeParked, car, compactCar, disposeWorld, person, town, wildlife, type
 
 export type Preferences = { quality:'low'|'medium'|'high'; light:'cycle'|'day'|'night'; audio:boolean; color:string; seenIntro:boolean };
 export type Stats = { fps:number; frame:number; draws:number; triangles:number; scale:number };
-export type Snapshot = Point & { angle:number; speed:number; driving:boolean; near:DistrictId|null; neighbor:number; pet:number; night:boolean; height:number; room:RoomId|null; pace:'idle'|'walk'|'run'|'sprint'|'airborne' };
+export type Snapshot = Point & { angle:number; speed:number; driving:boolean; health:number; water:number; near:DistrictId|null; neighbor:number; pet:number; night:boolean; height:number; room:RoomId|null; pace:'idle'|'walk'|'run'|'sprint'|'airborne' };
 export type Game = {
   destroy:()=>void; interact:()=>void; vehicle:()=>void; travel:(d?:District)=>void;
   settings:(p:Preferences)=>void; gps:(d?:District)=>void; pause:(v:boolean)=>void;
   jump:()=>void; look:(radians:number)=>void; enterRoom:(id:RoomId)=>void; exitRoom:()=>void;
+  repair:()=>void; recover:()=>void;
   photo:(angle:number|null,zoom?:number)=>void; capture:()=>string; skip:()=>void;
 };
 type Events = {
@@ -46,8 +47,19 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
   const city=town(!software); scene.add(city.root);
   const motion=createMotion(), vehicle=car(prefs.color,true), driver=person('#368481','#b77c56',2);
   scene.add(vehicle.root,driver.root);
+  const scuff=new T.Group();
+  for(const side of [-1,1]){
+    const mark=new T.Mesh(new T.BoxGeometry(.43,.016,.075),new T.MeshBasicMaterial({color:'#263535'}));
+    mark.position.set(side*.54,.825,1.93);mark.rotation.y=side*.37;scuff.add(mark);
+    const cracked=new T.Mesh(new T.BoxGeometry(.18,.023,.028),new T.MeshBasicMaterial({color:'#d9d9c9'}));
+    cracked.position.set(side*.73,.67,2.068);cracked.rotation.y=side*.65;scuff.add(cracked);
+  }
+  scuff.visible=false;vehicle.root.add(scuff);
   const cars=createTraffic();
   const outdoorSolid=(x:number,z:number,radius:number)=>blocked(x,z,radius)||trafficSolid(cars,x,z,radius);
+  const drivingSolid=(x:number,z:number,radius:number)=>blocked(x,z,radius,true)||trafficSolid(cars,x,z,radius)||
+    [...crowds,...landlords,...animals.slice(0,3)].some(actor=>actor.root.visible&&actor.root.position.y<1&&
+      Math.hypot(x-actor.root.position.x,z-actor.root.position.z)<radius+.52);
   const streetSignals=createSignals();
   scene.add(streetSignals.mesh);
   const trafficMeshes=cars.map(state=>{
@@ -89,6 +101,8 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
   const routeSegments=Array.from({length:24},()=>{
     const m=new T.Mesh(new T.BoxGeometry(1,.045,.31),routeMaterial); m.visible=false; scene.add(m); return m;
   });
+  const splash=new T.Mesh(new T.RingGeometry(1.3,1.65,28),new T.MeshBasicMaterial({color:'#d6eee7',transparent:true,opacity:.44,side:T.DoubleSide,depthWrite:false}));
+  splash.rotation.x=-Math.PI/2;splash.visible=false;scene.add(splash);
   const shadows=makeContactShadows(2+parkedCars.length+landlords.length+crowds.length+animals.length);
   scene.add(shadows);
   const shadowMatrix=new T.Object3D();
@@ -105,6 +119,7 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
   let room:{id:RoomId;saved:Motion;view:ReturnType<typeof makeRoom>}|undefined;
   let cameraYaw=0,signalTick=-1;
   let time=0, intro=prefs.seenIntro?0:3.4, first=true, raf=0, last=0, nextHUD=0, nextGPS=0, previousVisit:DistrictId|null=null;
+  let nextImpact=0,crashShake=0;
   let frames=0, sample=0, frameWorst=0, adaptiveCooldown=0, disposed=false, contextLost=false;
   let latestNear:District|undefined, latestPet=-1, latestNeighbor=-1, atSecret=false;
   let reflections:T.Texture|undefined,paintNormal:T.Texture|undefined;
@@ -222,7 +237,16 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
     vehicle.lights.visible=night>.43;
     const carHeight=lookoutHeight(motion.car.x,motion.car.z);
     const playerHeight=motion.driving?0:lookoutHeight(motion.player.x,motion.player.z);
-    vehicle.root.position.set(motion.car.x,.12+carHeight,motion.car.z); vehicle.root.rotation.y=motion.car.angle;
+    vehicle.root.position.set(motion.car.x,.12+carHeight-motion.water*.38,motion.car.z); vehicle.root.rotation.y=motion.car.angle;
+    splash.visible=motion.water>.08;
+    if(splash.visible){
+      splash.position.set(motion.car.x,motion.car.z<7&&motion.car.z>-7?-.29:.31,motion.car.z);
+      splash.scale.setScalar(1+(time%1)*.65);
+      (splash.material as T.MeshBasicMaterial).opacity=.39*(1-time%1);
+    }
+    vehicle.paint.roughness=.29+(100-motion.health)*.003;
+    vehicle.lights.visible=vehicle.lights.visible&&motion.health>28;
+    scuff.visible=motion.health<70;
 
     const pace=Math.min(1,Math.abs(motion.velocity)/16);
     vehicle.root.rotation.z=reduced?0:motion.steering*pace*.024;
@@ -278,15 +302,22 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
         const delta=patrolX-p.root.position.x;
         const nextX=p.root.position.x+Math.sign(delta)*Math.min(1.08*dt,Math.abs(delta));
         const canWalk=walking&&Math.abs(delta)>.025&&!outdoorSolid(nextX,n.z,.44)&&Math.hypot(nextX-pose.x,n.z-pose.z)>(motion.driving?2.2:.92);
-        const npcX=canWalk?nextX:p.root.position.x;
-        p.root.position.set(npcX,sitting?-.14:.18+lookoutHeight(npcX,n.z),n.z);
-        const range=Math.hypot(npcX-pose.x,n.z-pose.z);
+        let npcX=canWalk?nextX:p.root.position.x;
+        let npcZ=p.root.position.z;
+        const carRange=Math.hypot(npcX-motion.car.x,npcZ-motion.car.z);
+        if(motion.driving&&Math.abs(motion.velocity)>3&&carRange<5.5){
+          const awayX=(npcX-motion.car.x)/(carRange||1),awayZ=(npcZ-motion.car.z)/(carRange||1);
+          const dodgeX=npcX+awayX*dt*3.7,dodgeZ=npcZ+awayZ*dt*3.7;
+          if(!blocked(dodgeX,dodgeZ,.44)){npcX=dodgeX;npcZ=dodgeZ;}
+        }
+        p.root.position.set(npcX,sitting?-.14:.18+lookoutHeight(npcX,npcZ),npcZ);
+        const range=Math.hypot(npcX-pose.x,npcZ-pose.z);
         const rangeLimit=software?23:quality<.68?32:44;
         p.root.visible=range<rangeLimit;
         if(!p.root.visible)return;
         const detailed=range<(software?10:22);
         const rig=p.setDetail(detailed);
-        const facing=!motion.driving&&range<2.75?Math.atan2(pose.x-npcX,pose.z-n.z):
+        const facing=!motion.driving&&range<2.75?Math.atan2(pose.x-npcX,pose.z-npcZ):
           canWalk?(delta>0?Math.PI/2:-Math.PI/2):Math.sin(.48*time+i)*.19;
         p.root.rotation.y+=Math.atan2(Math.sin(facing-p.root.rotation.y),Math.cos(facing-p.root.rotation.y))*Math.min(1,dt*7);
         if(rig){
@@ -298,7 +329,15 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
       animals.forEach((p,i)=>{
         const base=pets[i], a=time*(i<3?.73:.98)+i*1.3;
         const x=base?.x??62, z=base?.z??-45, span=i<2?.75:i===2?1.2:10+i;
-        p.root.position.set(x+Math.cos(a)*span,i<2?.36:i===2?.11:i%2?5+i*.23:.95+Math.sin(time+i)*.28,z+Math.sin(a)*span*.7);
+        let animalX=x+Math.cos(a)*span,animalZ=z+Math.sin(a)*span*.7;
+        const carRange=Math.hypot(animalX-motion.car.x,animalZ-motion.car.z);
+        if(i<3&&motion.driving&&Math.abs(motion.velocity)>3&&carRange<5){
+          const angle=Math.atan2(animalX-motion.car.x,animalZ-motion.car.z);
+          const fleeX=animalX+Math.sin(angle)*Math.min(2.5,5-carRange);
+          const fleeZ=animalZ+Math.cos(angle)*Math.min(2.5,5-carRange);
+          if(!blocked(fleeX,fleeZ,.3)){animalX=fleeX;animalZ=fleeZ;}
+        }
+        p.root.position.set(animalX,i<2?.36:i===2?.11:i%2?5+i*.23:.95+Math.sin(time+i)*.28,animalZ);
         p.root.rotation.y=-a+.4;
         p.root.visible=distance({x,z},pose)<61&&(i<3||quality>.72);
         if(p.root.visible&&p.tail&&!reduced)p.tail.rotation.y=Math.sin(time*5+i)*.51;
@@ -325,6 +364,7 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
     look.copy(target);
     if(photo===null){look.x+=Math.sin(aim)*4.4; look.z+=Math.cos(aim)*4.4;}
     camera.position.lerp(desired,first?1:1-Math.exp(-dt*(photo===null?6.5:12)));
+    if(crashShake>.001){camera.position.x+=Math.sin(time*72)*crashShake;camera.position.y+=Math.cos(time*63)*crashShake*.55;crashShake*=Math.exp(-dt*13);}
     camera.lookAt(look);
     atmosphere.position.copy(camera.position);
     shadows.material.uniforms.strength.value=.37-night*.16;
@@ -362,7 +402,7 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
       const speed=Math.abs(motion.velocity);
       const pace=motion.height>.04?'airborne':speed<.2?'idle':speed<3.4?'walk':speed<6.5?'run':'sprint';
       renderer.domElement.dataset.traffic=room?'':String(cars.filter(car=>car.velocity>.2).length);
-      events.update({...pose,height:motion.height,room:room?.id??null,pace,speed:Math.abs(motion.velocity)*3.6,driving:motion.driving,near:previousVisit,neighbor:latestNeighbor,pet:latestPet,night:prefs.light==='night'||(prefs.light==='cycle'&&Math.cos(time*.024)<.12)});
+      events.update({...pose,height:motion.height,room:room?.id??null,pace,health:motion.health,water:motion.water,speed:Math.abs(motion.velocity)*3.6,driving:motion.driving,near:previousVisit,neighbor:latestNeighbor,pet:latestPet,night:prefs.light==='night'||(prefs.light==='cycle'&&Math.cos(time*.024)<.12)});
   };
   const tick=(now:number)=>{
     raf=0;
@@ -374,9 +414,12 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
       intro=Math.max(0,intro-dt);
       time+=dt;
       const steps=Math.max(1,Math.ceil(dt/.032));
-      const solid=room?roomBlocked:outdoorSolid;
+      const solid=room?roomBlocked:motion.driving?drivingSolid:outdoorSolid;
       if(!room)advanceTraffic(cars,time,dt,[motion.car,motion.driving?motion.car:motion.player]);
-      for(let i=0;i<steps;i++)step(motion,input,dt/steps,solid);
+      let impact=0;
+      for(let i=0;i<steps;i++){step(motion,input,dt/steps,solid);impact=Math.max(impact,motion.impact);}
+      if(motion.driving&&motion.submerged>2.8){recover(motion);events.note('Vehicle recovered at the city entrance.');}
+      else if(motion.driving&&impact>8&&now>nextImpact){nextImpact=now+1200;crashShake=Math.min(.18,impact*.007);events.note('Collision: vehicle condition '+Math.round(motion.health)+'%.');}
       cameraYaw*=Math.exp(-dt*(Math.abs(motion.velocity)>1?.75:.11));
     }
     const pose=motion.driving?motion.car:motion.player;
@@ -421,6 +464,8 @@ export function startWorld(host:HTMLElement, input:Inputs, prefs:Preferences, ev
     },
     vehicle(){if(room)return;events.note(enterExit(motion,outdoorSolid));updateHUD();},
     jump(){jump(motion);},
+    repair(){repair(motion);events.note('Vehicle repaired.');updateHUD();},
+    recover(){recover(motion);events.note('Vehicle recovered at the city entrance.');updateHUD();},
     look(radians){cameraYaw=T.MathUtils.clamp(cameraYaw+radians,-Math.PI,Math.PI);},
     enterRoom(id){
       if(room)return;

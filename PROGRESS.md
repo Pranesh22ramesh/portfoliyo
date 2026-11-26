@@ -1,5 +1,14 @@
 # Developer World progress
 
+## Vehicle impact and water response
+
+- Vehicle impacts now reduce condition according to entry speed. The HUD offers repair, and a camera jolt and visible body scuffs mark stronger crashes.
+- The river and pond accept the player's car. Water slows and stalls it, adds a surface ripple, and returns the car to the entrance after sustained submersion. A recover button is available immediately.
+- Moving pedestrians and ground animals receive collision clearance from the player's car and move away when it approaches. Gameplay remains non-graphic.
+- The existing collision and water simulation is kinematic. This update does not include a rigid-body physics engine, body deformation, ragdolls, swimming, or a full environment art rebuild.
+
+Local production checks passed with 15 Jest tests, build, TypeScript, lint, and the 10 browser scenarios after correcting the directory return path in its test. Chrome at spawn measured 140 FPS on Intel UHD desktop, 144 FPS with a mobile viewport on the same GPU, and 22 FPS on SwiftShader with 4x CPU throttling. These are short browser samples; physical mobile hardware and sustained memory behavior remain unmeasured.
+
 ## City driving and on-foot exploration
 
 - Added walking, running, sprinting, jumping, ground collision, and a third-person orbit camera. Keyboard and touch controls support both driving and on-foot play.
