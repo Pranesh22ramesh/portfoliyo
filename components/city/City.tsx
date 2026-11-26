@@ -10,7 +10,7 @@ import type { Game, Preferences, Snapshot, Stats } from './engine';
 import { roomLabels as roomTitle, type RoomId } from '@/lib/rooms';
 import { canCompleteMission, missions, type Mission, type MissionId } from '@/lib/missions';
 import { startAudio } from './audio';
-import { credentials, projects } from '@/lib/portfolio';
+import { credentials, profile, projects } from '@/lib/portfolio';
 import { ProjectDetail, CredentialDetail } from './PortfolioDetail';
 import { Portfolio } from './Portfolio';
 import { Directory } from './Directory';
@@ -269,7 +269,7 @@ export function City(){
       onPointerUp={()=>{orbit.current=null;}} onPointerCancel={()=>{orbit.current=null;}} onLostPointerCapture={()=>{orbit.current=null;}}/>
     <div className="dw-shade"/>
     <div className="dw-world-head">
-      <div className="dw-world-title" data-in-motion={status==='ready'&&(hud.speed>5||Boolean(near)||Boolean(hud.room))}><p className="dw-kicker"><Compass size={15}/> Pranesh Ramesh</p><h1>Developer World<span>.</span></h1><p className="dw-subtitle">Explore the town or open the destination directory.</p></div>
+      <div className="dw-world-title" data-in-motion={status==='ready'&&(hud.speed>5||Boolean(near)||Boolean(hud.room))}><p className="dw-kicker"><Compass size={15}/> {profile.name}</p><h1>Developer World<span>.</span></h1><p className="dw-subtitle">Explore the town or open the destination directory.</p></div>
       <div className="dw-toolbar" aria-label="Game tools">
         <button type="button" onClick={()=>open('phone')} title="Field phone" aria-label="Field phone"><Smartphone size={18}/><span>Phone</span></button>
         <button type="button" onClick={()=>open('directory')} title="Destination directory" aria-label="Destination directory"><BookOpen size={18}/><span>Directory</span></button>
@@ -341,7 +341,7 @@ export function City(){
         {panel==='directory'&&<Directory onSelect={openDistrict}/>}
         {panel==='resume'&&<>
           <div className="dw-actions"><a className="dw-button dw-primary" href="/resume.pdf" download>Download Resume</a><a href="/resume.pdf" target="_blank" rel="noreferrer">Open PDF in new tab</a></div>
-          <iframe className="dw-resume-preview" title="Pranesh Ramesh Resume" src="/resume.pdf#view=FitH"/>
+          <iframe className="dw-resume-preview" title={`${profile.name} Resume`} src="/resume.pdf#view=FitH"/>
         </>}
         {panel==='map'&&<>
           <div className="dw-map-layout"><CityMap hud={mapPose} goal={goal} select={setSelected}/>

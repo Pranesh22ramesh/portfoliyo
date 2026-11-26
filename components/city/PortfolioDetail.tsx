@@ -8,7 +8,7 @@ export function ProjectDetail({project:p}:{project:Project}){
     <p>{p.stack}</p>
     {p.image&&<figure className="dw-project-image"><Image src={p.image} alt="Twincord certificate portal sign-in screen" width={1000} height={644}/><figcaption>Public sign-in screen for the certificate portal</figcaption></figure>}
     <div className="dw-entries">{[['Problem',p.problem],['Solution',p.solution],['Architecture',p.architecture],['Evidence',p.result]].map(([label,content])=><article key={label}><h3>{label}</h3><p>{content}</p></article>)}</div>
-    <div className="dw-actions"><a className="dw-button dw-primary" href={link.href}>{link.label}</a></div>
+    {link&&<div className="dw-actions"><a className="dw-button dw-primary" href={link.href}>{link.label}</a></div>}
   </>;
 }
 

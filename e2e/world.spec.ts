@@ -73,6 +73,13 @@ test('in-game directory, deep links, credentials and invalid routes',async({page
   await expect(dialog.getByRole('button',{name:/Project Lab/})).toHaveCount(0);
   await search.fill('something-unknown');
   await expect(dialog.getByText('No matching destinations.',{exact:false})).toBeVisible();
+  await search.fill('forensiq');
+  await dialog.getByRole('button',{name:/Project Lab/}).click();
+  const forensiq=dialog.getByRole('article').filter({has:page.getByRole('heading',{name:'ForensIQ',exact:true})});
+  await forensiq.getByRole('link',{name:'Read case study'}).click();
+  await expect(dialog.getByRole('heading',{name:'ForensIQ'})).toBeVisible();
+  await expect(dialog.getByRole('link',{name:'View GitHub repository'})).toHaveCount(0);
+  await page.goto('/#portfolio');
   await search.fill('cisco');
   await dialog.getByRole('button',{name:/Achievement Museum/}).click();
   await expect(dialog.getByRole('heading',{name:'Achievement Museum'})).toBeVisible();
@@ -90,7 +97,7 @@ test('in-game directory, deep links, credentials and invalid routes',async({page
   await page.goto('/projects/Certificate_Generator');
   await expect(page.getByRole('heading',{name:'Architecture'})).toBeVisible();
   await page.goto('/#research');
-  await dialog.getByRole('link',{name:'Read case study'}).click();
+  await dialog.getByRole('link',{name:'Read case study'}).and(dialog.locator('a[href="/projects/api_downtime_anlyzes"]')).click();
   await expect(dialog.getByRole('heading',{name:'API Downtime Analyzer'})).toBeVisible();
   await dialog.getByRole('button',{name:'Back to destination'}).click();
   await expect(dialog.getByRole('heading',{name:'Research Center'})).toBeVisible();
@@ -143,7 +150,7 @@ test('WebGL unavailable keeps the in-game directory accessible',async({page})=>{
   await page.getByRole('button',{name:'Browse destinations'}).click();
   const dialog=page.getByRole('dialog');
   await dialog.getByRole('button',{name:/University/}).click();
-  await expect(dialog).toContainText('7.18/10');
+  await expect(dialog).toContainText('7.12/10');
 });
 
 test('first visit intro can be skipped and context loss can recover',async({page})=>{
@@ -215,6 +222,7 @@ test('viewport and overlays stay scroll-contained after resize',async({page})=>{
   await page.keyboard.press('Escape');
   await page.goto('/#experience');
   await expect(dialog.getByRole('heading',{name:'IT Park'})).toBeVisible();
+  await expect(dialog.getByRole('heading',{name:'IGBC Domain Expert & Sustainability Assessor'})).toBeVisible();
   await expect(dialog).toContainText('Twincord');
   await dialog.getByRole('button',{name:'All destinations'}).click();
   await dialog.getByRole('searchbox').fill('wasd');

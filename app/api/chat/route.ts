@@ -4,7 +4,7 @@ const replies = [
   { terms:/resume|about|profile/i, text:'You can download Pranesh’s [resume](/resume.pdf) or read his [profile](/#home).' },
   { terms:/skill|stack|react|python/i, text:'The [Skill Workshop](/#skills) covers frontend, mobile, backend, cloud and applied ML.' },
   { terms:/project|work|code/i, text:'See the [Project Lab](/#projects) for selected work and GitHub repositories.' },
-  { terms:/intern|job|experience/i, text:'Pranesh held internships at JAC MediaLand and Twincord. See [IT Park](/#experience).' },
+  { terms:/intern|job|experience|igbc|sustainability/i, text:'Pranesh currently works as an IGBC domain expert, sustainability assessor and AI knowledge engineer. His past internships were at JAC MediaLand and Twincord. See [IT Park](/#experience).' },
   { terms:/course|award|certif/i, text:'The [Achievement Museum](/#achievements) contains certificate images and available issuer links.' },
   { terms:/contact|email/i, text:'Reach Pranesh by [email](mailto:'+email+') or visit the [Post Office](/#contact).' },
 ];
